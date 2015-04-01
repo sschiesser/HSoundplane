@@ -25,7 +25,11 @@ boolean debug = true;
 
 #define DRV_GAIN 1 // gain setting for drv2667 (0 - 3)
 #define I2C_DRV2667_ADDRESS 0x59 // default i2c address of the drv2667
-#define I2C_SWITCH_ADDRESS 0x23;
+#define I2C_SWITCH_ADDRESS 0x23
+
+#define MAX_COORD_PAIRS 16 // Maximum number of touch coordinates
+#define START_MARKER_MASK 0xE0
+#define STOP_MARKER_MASK 0xF0
 
 /* ------------------------- *
  * Parsing command variables *
@@ -47,6 +51,13 @@ int swOff[arrayItems]; // Array of all possible piezos to switch OFF
 int swOn[arrayItems]; // Array of all possible piezos to switch ON
 int strLength; // Length of the entered command line string
 boolean doSwitch; // Flag to enter the relay switching routine
+
+
+/* ------------------------- *
+ * Soundplane variables      *
+ * ------------------------- */
+char coordinates[MAX_COORD_PAIRS][2]; // Create the coordinate pairs table used in serial receiving
+
 
 /* ------------------------- *
  * DRV2667 control variables *
@@ -422,121 +433,188 @@ int parseCommand(String com) {
   String subPart; // substring used for trimming
   int i, len;
   boolean cont; // Flag to continue slicing the command string
-  boolean slave; // Flag to indicate that slave address has been read
+//  boolean slave; // Flag to indicate that slave address has been read
   
-// #2 - x y z (ON only)
+  unsigned int coord, index;
+  boolean startMarkerSet, byteOne, firstPair, lastPair;
+  
   if(debug) {
     Serial.print("Received: ");
     Serial.println(com);
   }
   if(com.length() != 0) {
     cont = true;
-    slave = false;
-    len = 0;
+    byteOne = true;
     com.concat(" "); // Work around to be able to terminate the parsing of the string
     i = 0;
     while(cont) {
       subPart = com.substring(0, com.indexOf(" "));
       subPart.trim();
-      
-      if(subPart.charAt(0) == 's') {
-        String str = subPart;
-        str.remove(0, 1); // Removing 's'
-        if(debug) {
-          Serial.print("'s' found... appending ");
-          Serial.println(str);
-        }
-        
-        if(switchOn == false) {
-          if(debug) {
-            Serial.print("Device standing by... waking up.\n");
-          }
-          reset = true;
-          switchOn = true;
-          setupDriver(reset, switchOn, drvGain);
-        }
-
-        if((str >= String(0)) && (str <= String(9))) {
-          if(str.toInt() < maxSlaveVal) {
-            if(debug) {
-              Serial.print("OK\n");
-              Serial.print("slave = ");
-              Serial.println(str.toInt());
-            }
+//      if(debug) Serial.print("Byte: "); Serial.println(subPart.toInt());
             
-            slave = true;
-          }
-          else {
-            if(debug) {
-              Serial.println("Wrong value!");
-            }
-            
-            cont = false;
-          }
+      /* Byte marker logic:
+       * - if B1 (col) & start marker      -> first byte
+       * - if B1 (col) & NOT start marker  -> any B1
+       * - if B2 (raw) & stop marker       -> last byte
+       * - if B2 (raw) & NOT stop marker   -> any B2
+       */
+//      if(debug) Serial.print("Working...\nbyteOne: "); Serial.println((byteOne) ? "true" : "false");
+      coord = subPart.toInt();
+      if(byteOne) {
+        if(coord & START_MARKER_MASK) {
+          firstPair = true;
+          lastPair = false;
+        } else {
+          firstPair = false;
+        }
+      } else {
+        if(coord & STOP_MARKER_MASK) {
+          lastPair = true;
+        } else {
+          lastPair = false;
         }
       }
-      else if(subPart.charAt(0) == 'x') {
-        if(debug) {
-          Serial.print("'x' found... exiting\n");
-        }
-        
-        reset = false;
-        switchOn = false;
-//        drvGain = 0;
-        setupDriver(reset, switchOn, drvGain);
+//      if(debug) {
+//        Serial.print("firstPair: "); Serial.println((firstPair) ? "true" : "false");
+//        Serial.print("lastPair: "); Serial.println((lastPair) ? "true" : "false");
+//      }
 
-        slave = false;
+      
+      if(byteOne & firstPair) {
+        if(debug) Serial.println("B1 & ST");
+        index = 0;
+        coordinates[index][0] = coord;
+        byteOne = false;
+      } else if(byteOne & !firstPair) {
+        if(debug) Serial.println("B1 & ...");
+        coordinates[index][0] = coord;
+        byteOne = false;
+      } else if(!byteOne & !lastPair) {
+        if(debug) Serial.println("B2 & ...");
+        coordinates[index][1] = coord;
+        index += 1;
+        byteOne = true;
+      } else if(!byteOne & lastPair) {
+        if(debug) Serial.println("B2 & SP");
+        coordinates[index][1] = coord;
+        byteOne = true;
+        len = index + 1;
+      } else {
+        if(debug) Serial.println("ERROR in pair matching!");
       }
       
-      if(slave == true) {
-        if((subPart >= String(0)) && (subPart <= String(9))) {
-          if(debug) Serial.println("Valid type");
-          if(subPart.toInt() < maxPiezoVal) {
-            if(debug) Serial.println("Valid number");
-            swOn[i] = subPart.toInt();
-            i += 1;
-            len = i;
-          }
-          else {
-            if(debug) Serial.println("Invalid number! Flushing...");
-          }
-        }
-        else {
-          if(debug) Serial.println("Invalid type! Flushing...");
-        }
-        
-        com.remove(0, com.indexOf(" ") + 1);
-        
-        if(debug) {
-          Serial.print("subPart: ");
-          Serial.println(subPart);
-          Serial.print("piezo#: ");
-          Serial.println(swOn[i-1]);
-          Serial.print("remaining string: ");
-          Serial.println(com);
-        }
-        if(com.length() <= 0) cont = false;
-      }
-      else {
-        cont = false;
-      }
-    }
-  
-      if(debug) {
-        Serial.print("Whole array: ");
-        for(i = 0; i < len; i++) {
-          Serial.print(swOn[i]);
-          Serial.print(" - ");
-        }
-        Serial.print("\n");
-      }
-    }
-    else {
-      len = 0;
-      cont = false;
+      com.remove(0, com.indexOf(" ") + 1);
+      if(com.length() <= 0) cont = false;
     }
     
-  doSwitch = true;
+    if(debug) {
+      Serial.println("Coordinates table:");
+      for(i = 0; i < len; i++) {
+        Serial.print("x "); Serial.print(coordinates[i][0], DEC);
+        Serial.print("   y "); Serial.println(coordinates[i][1], DEC);
+      }
+    }
+  }    
+        
+        
+//      if(subPart.charAt(0) == 's') {
+//        String str = subPart;
+//        str.remove(0, 1); // Removing 's'
+//        if(debug) {
+//          Serial.print("'s' found... appending ");
+//          Serial.println(str);
+//        }
+//        
+//        if(switchOn == false) {
+//          if(debug) {
+//            Serial.print("Device standing by... waking up.\n");
+//          }
+//          reset = true;
+//          switchOn = true;
+//          setupDriver(reset, switchOn, drvGain);
+//        }
+//
+//        if((str >= String(0)) && (str <= String(9))) {
+//          if(str.toInt() < maxSlaveVal) {
+//            if(debug) {
+//              Serial.print("OK\n");
+//              Serial.print("slave = ");
+//              Serial.println(str.toInt());
+//            }
+//            
+//            slave = true;
+//          }
+//          else {
+//            if(debug) {
+//              Serial.println("Wrong value!");
+//            }
+//            
+//            cont = false;
+//          }
+//        }
+//      }
+//      else if(subPart.charAt(0) == 'x') {
+//        if(debug) {
+//          Serial.print("'x' found... exiting\n");
+//        }
+//        
+//        reset = false;
+//        switchOn = false;
+////        drvGain = 0;
+//        setupDriver(reset, switchOn, drvGain);
+//
+//        slave = false;
+//      }
+//      
+//      if(slave == true) {
+//        if((subPart >= String(0)) && (subPart <= String(9))) {
+//          if(debug) Serial.println("Valid type");
+//          if(subPart.toInt() < maxPiezoVal) {
+//            if(debug) Serial.println("Valid number");
+//            swOn[i] = subPart.toInt();
+//            i += 1;
+//            len = i;
+//          }
+//          else {
+//            if(debug) Serial.println("Invalid number! Flushing...");
+//          }
+//        }
+//        else {
+//          if(debug) Serial.println("Invalid type! Flushing...");
+//        }
+//        
+//        com.remove(0, com.indexOf(" ") + 1);
+//        
+//        if(debug) {
+//          Serial.print("subPart: ");
+//          Serial.println(subPart);
+//          Serial.print("piezo#: ");
+//          Serial.println(swOn[i-1]);
+//          Serial.print("remaining string: ");
+//          Serial.println(com);
+//        }
+//        if(com.length() <= 0) cont = false;
+//      }
+//      else {
+//        cont = false;
+//      }
+//    }
+//  
+//      if(debug) {
+//        Serial.print("Whole array: ");
+//        for(i = 0; i < len; i++) {
+//          Serial.print(swOn[i]);
+//          Serial.print(" - ");
+//        }
+//        Serial.print("\n");
+//      }
+//    }
+//    else {
+//      len = 0;
+//      cont = false;
+//    }
+//    
+//  doSwitch = true;
 
   return len; // returns the length of the parsed command line
 }
