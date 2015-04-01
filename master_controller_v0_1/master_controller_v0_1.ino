@@ -66,8 +66,11 @@ char coordinates[MAX_COORD_PAIRS][2]; // Create the coordinate pairs table used 
 /* ------------------------- *
  * Arduino nano (slave) vars *
  * ------------------------- */
-unsigned int i2cSlaveAddresses[] = {I2C_SLAVE_ADDR1, I2C_SLAVE_ADDR2, I2C_SLAVE_ADDR3, I2C_SLAVE_ADDR4};
+char i2cSlaveAddresses[] = {I2C_SLAVE_ADDR1, I2C_SLAVE_ADDR2, I2C_SLAVE_ADDR3, I2C_SLAVE_ADDR4};
 boolean i2cSlaveAvailable[NUMBER_OF_SLAVES];
+boolean drv2667Reset = true;
+boolean drv2667SwitchOn = true;
+char drv2667Gain = 3;
 
 
 /* ------------------------------------------------- *
@@ -83,25 +86,6 @@ int OEpin = 10;
 int LOADpin = 9; // Storage clock
 int CLRpin = 8; // Master reset
 
-// Array of eight piezo columns (8 x 9) single addressed. To combine: bitwise AND (&)
-unsigned long piezoArray1[4][9] = {
-  {0xFFFFFFFE, 0xFFFFFFFD, 0xFFFFFFFB, 0xFFFFFFF7, 0xFFFFFFEF, 0xFFFFFFDF, 0xFFFFFFBF, 0xFFFFFF7F, 0xFFFFFEFF} , // Row 1
-  {0XFFFFFDFF, 0XFFFFFBFF, 0XFFFFF7FF, 0XFFFFEFFF, 0XFFFFDFFF, 0XFFFFBFFF, 0XFFFF7FFF, 0XFFFEFFFF, 0XFFFDFFFF} , // Row 2
-  {0XFFFBFFFF, 0XFFF7FFFF, 0XFFEFFFFF, 0XFFDFFFFF, 0XFFBFFFFF, 0XFF7FFFFF, 0XFEFFFFFF, 0XFDFFFFFF, 0XFBFFFFFF} , // Row 3
-  {0XF7FFFFFF, 0xEFFFFFFF, 0xDFFFFFFF, 0xBFFFFFFF, 0x7FFFFFFF, 0x00000000, 0x00000000, 0x00000000, 0x00000000}   // Row 4 (5/9)
-};
-unsigned long piezoArray2[4][9] = {
-  {0xFFFFFFFE, 0xFFFFFFFD, 0xFFFFFFFB, 0xFFFFFFF7, 0xFFFFFFEF, 0xFFFFFFDF, 0xFFFFFFBF, 0xFFFFFF7F, 0xFFFFFEFF} , // Row 4 - 5
-  {0XFFFFFDFF, 0XFFFFFBFF, 0XFFFFF7FF, 0XFFFFEFFF, 0XFFFFDFFF, 0XFFFFBFFF, 0XFFFF7FFF, 0XFFFEFFFF, 0XFFFDFFFF} , // Row 5 - 6
-  {0XFFFBFFFF, 0XFFF7FFFF, 0XFFEFFFFF, 0XFFDFFFFF, 0XFFBFFFFF, 0XFF7FFFFF, 0XFEFFFFFF, 0XFDFFFFFF, 0XFBFFFFFF} , // Row 6 - 7
-  {0XF7FFFFFF, 0xEFFFFFFF, 0xDFFFFFFF, 0xBFFFFFFF, 0x7FFFFFFF, 0x00000000, 0x00000000, 0x00000000, 0x00000000}   // Row 7 (5/9)
-};
-byte piezoArray3[8] = {0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F}; // Row 8
-
-// Resulting values of the bitwise AND of the peizo arrays
-unsigned long piezoVal1;
-unsigned long piezoVal2;
-byte piezoVal3;
 
 
 /******************************
@@ -139,7 +123,7 @@ void loop()
     char c = Serial.read();
     
     if(c == '\n') {
-      strLength = parseCommand(command);
+      strLength = parse_command(command);
       command = "";
     }
     else {
@@ -156,25 +140,45 @@ void loop()
 void slaves_init() {
   unsigned int i, receivedAddr;
   if(debug) Serial.println("Initializing slaves...");
+
+  // Registering...
   for(i = 0; i < NUMBER_OF_SLAVES; i++) {
-//    if(debug) {
-//      Serial.print("Requesting from 0x"); Serial.println(i2cSlaveAddresses[i], HEX);
-//    }
     Wire.requestFrom(i2cSlaveAddresses[i], 1);
     
     while(Wire.available()) {
       receivedAddr = Wire.read();
-//      if(debug) {
-//        Serial.print("Received address 0x"); Serial.println(receivedAddr, HEX);
-//      }
       if(receivedAddr == i2cSlaveAddresses[i]) {
         i2cSlaveAvailable[i] = true;
       } else {
         i2cSlaveAvailable[i] = false;
       }
     }
-    
-    if(debug) Serial.print("Slave @ address 0x"); Serial.print(i2cSlaveAddresses[i], HEX); Serial.println((i2cSlaveAvailable[i]) ? " available" : " NOT available");
+    if(debug) {
+      Serial.print("Slave @ address 0x"); Serial.print(i2cSlaveAddresses[i], HEX);
+      Serial.println((i2cSlaveAvailable[i]) ? " available" : " NOT available");
+    }
+  }
+   
+  /* Setting up values...
+   * Bytes (3) order:
+   * - reset (0/1)
+   * - switch ON (0/1)
+   * - drv gain (0 - 3)
+   */
+  for(i = 0; i < NUMBER_OF_SLAVES; i++) {
+    if(i2cSlaveAvailable[i]) {
+      if(debug) {
+        Serial.print("Sending to 0x"); Serial.print(i2cSlaveAddresses[i], HEX);
+        Serial.print(": "); Serial.print(drv2667Reset);
+        Serial.print(" - "); Serial.print(drv2667SwitchOn);
+        Serial.print(" - "); Serial.println(drv2667Gain, DEC);
+      }
+      Wire.beginTransmission(i2cSlaveAddresses[i]);
+      Wire.write((char)drv2667Reset);
+      Wire.write((char)drv2667SwitchOn);
+      Wire.write(drv2667Gain);
+      Wire.endTransmission();
+    }
   }
 }
 
@@ -182,9 +186,9 @@ void slaves_init() {
 
 
 /******************************
- **      PARSECOMMAND        **
+ **      PARSE_COMMAND       **
  ******************************/
-int parseCommand(String com) {
+int parse_command(String com) {
   if(debug) Serial.println("Entering parser...");
 
   String subPart; // substring used for trimming
