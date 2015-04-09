@@ -1,7 +1,15 @@
 #include <Wire.h>
 
-#define TWI_FREQ 100000L
+boolean debug = false;
+
+#define I2C_FAST_MODE 1
 #define I2C_SLAVE_ADDRESS 0x51
+
+#if(I2C_FAST_MODE > 0)
+  boolean i2cFastMode = true;
+#else
+  boolean i2cFastMode = false;
+#endif
 
 boolean drv2667Reset, drv2667SwitchOn;
 char drv2667Gain;
@@ -9,25 +17,30 @@ char drv2667Gain;
 void setup() {
   Serial.begin(57600);
   Wire.begin(I2C_SLAVE_ADDRESS);
+  if(i2cFastMode) Wire.setClock(400000); //TWBR = 12;
   Wire.onRequest(requestEvent);
   Wire.onReceive(receiveEvent);
 }
 
 void loop() {
-  delay(10);
+  delay(1);
 }
 
 void requestEvent() {
-  Serial.print("I2C request received... sending own address 0x"); Serial.println(I2C_SLAVE_ADDRESS, HEX);
+  if(debug) {
+    Serial.print("I2C request received... sending own address 0x"); Serial.println(I2C_SLAVE_ADDRESS, HEX);
+  }
   Wire.write(I2C_SLAVE_ADDRESS);
 }
 
 void receiveEvent(int n) {
-  Serial.print("I2C message received... ");
   drv2667Reset = (Wire.read() == 1) ? true : false;
   drv2667SwitchOn = (Wire.read() == 1) ? true : false;
   drv2667Gain = Wire.read();
-  Serial.print(drv2667Reset); Serial.print(" - ");
-  Serial.print(drv2667SwitchOn); Serial.print(" - ");
-  Serial.println(drv2667Gain, DEC);
+  if(debug) {
+    Serial.print("I2C message received... ");
+    Serial.print(drv2667Reset); Serial.print(" - ");
+    Serial.print(drv2667SwitchOn); Serial.print(" - ");
+    Serial.println(drv2667Gain, DEC);
+  }
 }

@@ -14,53 +14,69 @@
 #include <SPI.h>
 #include <String.h>
 
-boolean debug = true;
+boolean debug = false;
 
 /* ***************************
  *   USER-DEFINED SETTINGS   *
  * ***************************/
 #define NUMBER_OF_SLAVES 4 // number of slaves to drive (max 4)
-#define NUMBER_OF_COLUMNS 8 // number of columns per slave (usually 8)
-#define PIEZO_RAWS_9 0 // piezo raws setting: 0 -> 5 items, 1 -> items
+#define COLUMNS_PER_SLAVE 8 // number of columns per slave (usually 8)
+#define PIEZO_RAWS_9 0 // piezo raws setting: 0 -> 5 items, 1 -> 9 items
 
-#define I2C_SLAVE_ADDR1 0x51
-#define I2C_SLAVE_ADDR2 0x52
-#define I2C_SLAVE_ADDR3 0x53
-#define I2C_SLAVE_ADDR4 0x54
-#define TWI_FREQ 100000L
+#define I2C_SLAVE_ADDR1 0x51 // i2c slave addresses
+#define I2C_SLAVE_ADDR2 0x52 // ..
+#define I2C_SLAVE_ADDR3 0x53 // ..
+#define I2C_SLAVE_ADDR4 0x54 // ..
+
+#define I2C_FAST_MODE 1 // i2c fast mode flag: 0 -> off (100 kHz), 1 -> on (400 kHz)
 
 #define STARTUP_WAIT_MS 2000
 
-#define MAX_COORD_PAIRS 16 // Maximum number of touch coordinates
-#define START_MARKER_MASK 0xE0
-#define STOP_MARKER_MASK 0xF0
+#define MAX_COORD_PAIRS 16 // maximum number of touch coordinates
+#define START_MARKER_MASK 0xE0 // bit mask to recognize serial start byte (ST)
+#define STOP_MARKER_MASK 0xF0 // bit mask to recognize serial stop byte (SP)
 
 /* ------------------------- *
  * Parsing command variables *
  * --------------------------*/
 #if(PIEZO_RAWS_9 > 0)
   boolean piezoRaw9 = true;
-  const int arrayItems = NUMBER_OF_COLUMNS * 9;
+  const int piezoMod = 9;
 #else
   boolean piezoRaw9 = false;
-  const int arrayItems = NUMBER_OF_COLUMNS * 5;
+  const int piezoMod = 5;
 #endif
 
-int piezoPerSlave = (piezoRaw9) ? (NUMBER_OF_COLUMNS * 9) : (NUMBER_OF_COLUMNS * 5);
-int maxSlaveVal = NUMBER_OF_SLAVES;
-int maxPiezoVal = maxSlaveVal * piezoPerSlave; // Current maximum number of available piezos
-
 String command; // Serial command to parse
-int swOff[arrayItems]; // Array of all possible piezos to switch OFF
-int swOn[arrayItems]; // Array of all possible piezos to switch ON
-int strLength; // Length of the entered command line string
-boolean doSwitch; // Flag to enter the relay switching routine
 
 
 /* ------------------------- *
  * Soundplane variables      *
  * ------------------------- */
-char coordinates[MAX_COORD_PAIRS][2]; // Create the coordinate pairs table used in serial receiving
+char coordinates[MAX_COORD_PAIRS][2]; // coordinate pairs table used in serial receiving
+char piezoIndex[NUMBER_OF_SLAVES][MAX_COORD_PAIRS]; // for each slave, indexes of the piezos to address 
+int pi[NUMBER_OF_SLAVES];
+int piezoPerSlave = COLUMNS_PER_SLAVE * piezoMod; // # piezos for each slave module
+int maxSlaveVal = NUMBER_OF_SLAVES; // # slave modules to talk to
+int maxPiezoVal = maxSlaveVal * piezoPerSlave; // current maximum number of available piezos
+
+/* arrays of 8 x 9 piezo matrix, single addressed.
+ * to combine          -> bitwise AND (&)
+ * to work with 5 raws -> jump over missing piezos
+ */
+//unsigned long piezoArray1[32] = {
+//  0xFFFFFFFE, 0xFFFFFFFD, 0xFFFFFFFB, 0xFFFFFFF7, 0xFFFFFFEF, 0xFFFFFFDF, 0xFFFFFFBF, 0xFFFFFF7F, 0xFFFFFEFF, // Row 1
+//  0XFFFFFDFF, 0XFFFFFBFF, 0XFFFFF7FF, 0XFFFFEFFF, 0XFFFFDFFF, 0XFFFFBFFF, 0XFFFF7FFF, 0XFFFEFFFF, 0XFFFDFFFF, // Row 2
+//  0XFFFBFFFF, 0XFFF7FFFF, 0XFFEFFFFF, 0XFFDFFFFF, 0XFFBFFFFF, 0XFF7FFFFF, 0XFEFFFFFF, 0XFDFFFFFF, 0XFBFFFFFF, // Row 3
+//  0XF7FFFFFF, 0xEFFFFFFF, 0xDFFFFFFF, 0xBFFFFFFF, 0x7FFFFFFF}; // Row 4 (5/9)
+//  
+//unsigned long piezoArray2[32] = {
+//  0xFFFFFFFE, 0xFFFFFFFD, 0xFFFFFFFB, 0xFFFFFFF7, 0xFFFFFFEF, 0xFFFFFFDF, 0xFFFFFFBF, 0xFFFFFF7F, 0xFFFFFEFF, // Row 4 - 5
+//  0XFFFFFDFF, 0XFFFFFBFF, 0XFFFFF7FF, 0XFFFFEFFF, 0XFFFFDFFF, 0XFFFFBFFF, 0XFFFF7FFF, 0XFFFEFFFF, 0XFFFDFFFF, // Row 5 - 6
+//  0XFFFBFFFF, 0XFFF7FFFF, 0XFFEFFFFF, 0XFFDFFFFF, 0XFFBFFFFF, 0XFF7FFFFF, 0XFEFFFFFF, 0XFDFFFFFF, 0XFBFFFFFF, // Row 6 - 7
+//  0XF7FFFFFF, 0xEFFFFFFF, 0xDFFFFFFF, 0xBFFFFFFF, 0x7FFFFFFF};   // Row 7 (5/9)
+//  
+//byte piezoArray3[8] = {0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F}; // Row 8
 
 
 /* ------------------------- *
@@ -72,19 +88,25 @@ boolean drv2667Reset = true;
 boolean drv2667SwitchOn = true;
 char drv2667Gain = 3;
 
+#if(I2C_FAST_MODE > 0)
+  boolean i2cFastMode = true;
+#else
+  boolean i2cFastMode = false;
+#endif
+
 
 /* ------------------------------------------------- *
  * Arduino pins connected to the piezo driver header *
  * ------------------------------------------------- */
-int LED1pin = 5; // LED1 -> Device started up
-int LED2pin = 6; // LED2 -> Initialization successful
-int LED3pin = 7; // LED3 -> SPI communication indication
-int SCKpin = 13; // Shift clock (i.e. SPI clock)
-int MISOpin = 12; //
-int MOSIpin = 11; // Data serial (i.e. MOSI)
-int OEpin = 10;
-int LOADpin = 9; // Storage clock
-int CLRpin = 8; // Master reset
+//int LED1pin = 5; // LED1 -> Device started up
+//int LED2pin = 6; // LED2 -> Initialization successful
+//int LED3pin = 7; // LED3 -> SPI communication indication
+//int SCKpin = 13; // Shift clock (i.e. SPI clock)
+//int MISOpin = 12; //
+//int MOSIpin = 11; // Data serial (i.e. MOSI)
+//int OEpin = 10;
+//int LOADpin = 9; // Storage clock
+//int CLRpin = 8; // Master reset
 
 
 
@@ -94,19 +116,18 @@ int CLRpin = 8; // Master reset
 void setup()
 {
   Serial.begin(57600);
+  Wire.begin(); // Start i2c
+  if(i2cFastMode) Wire.setClock(400000);
 
   if(debug) {
     Serial.println("\n\nBonjour... starting up!\n");
-  }
-
-  if(debug) {
     Serial.print("********************************\nAvailable slaves: "); Serial.println(maxSlaveVal);
     Serial.print("# piezos / slave: "); Serial.println(piezoPerSlave);
     Serial.print("  -> Max available piezos: "); Serial.println(maxPiezoVal);
     Serial.println("********************************\n");
+    Serial.print("I2C set @"); Serial.println((i2cFastMode) ? "400 kHz" : "100 kHz");
   }
 
-  Wire.begin(); // Start i2c
   slaves_init();
 
 }
@@ -125,6 +146,10 @@ void loop()
     if(c == '\n') {
       strLength = parse_command(command);
       command = "";
+      if(strLength != -1) {
+        distribute_coordinates(strLength);
+        send_to_slaves();
+      }
     }
     else {
       command += c;
@@ -132,6 +157,68 @@ void loop()
   }
 }
 
+
+
+/******************************
+ **  DISTRIBUTE_COORDINATES  **
+ ******************************/
+void distribute_coordinates(int len) {
+  int modulo, slaveNum, piezoPointer;
+
+  if(debug) Serial.println("Distributing coordinates...");
+  for(int i = 0; i < len; i++) {
+    if(coordinates[i][0] < COLUMNS_PER_SLAVE) {
+      int slaveAddress = i2cSlaveAddresses[0];
+      modulo = 0;
+      slaveNum = 0;
+    } else if(coordinates[i][0] < (2 * COLUMNS_PER_SLAVE)) {
+      int slaveAddress = i2cSlaveAddresses[1];
+      modulo = COLUMNS_PER_SLAVE;
+      slaveNum = 1;
+    } else if(coordinates[i][0] < (3 * COLUMNS_PER_SLAVE)) {
+      int slaveAddress = i2cSlaveAddresses[2];
+      modulo = 2 * COLUMNS_PER_SLAVE;
+      slaveNum = 2;
+    } else if(coordinates[i][0] < (4 * COLUMNS_PER_SLAVE)) {
+      int slaveAddress = i2cSlaveAddresses[3];
+      modulo = 3 * COLUMNS_PER_SLAVE;
+      slaveNum = 3;
+    }
+     // always multiply by 9!! Not connected piezo will be skipped.
+    piezoPointer = ((coordinates[i][0] - modulo) * 9) + (coordinates[i][1] * 2);
+    piezoIndex[slaveNum][pi[slaveNum]] = piezoPointer;
+    pi[slaveNum] += 1;
+    if(debug) {
+      int piezoPointer5 = ((coordinates[i][0] - modulo) * 5) + coordinates[i][1];
+      Serial.print("Slave#: "); Serial.print(slaveNum);
+      Serial.print(" Piezo#: "); Serial.print(piezoPointer);
+      Serial.print("("); Serial.print(piezoPointer5); Serial.println(")");
+      
+      Serial.print("piezoIndex = "); Serial.print(piezoIndex[slaveNum][pi[slaveNum]-1], DEC);
+      Serial.print("... pi = "); Serial.println(pi[slaveNum]-1);
+    }
+  }
+}
+
+
+/******************************
+ **     SEND_TO_SLAVES       **
+ ******************************/
+void send_to_slaves() {
+  for(int i = 0; i < NUMBER_OF_SLAVES; i++) {
+    if(i2cSlaveAvailable[i]) {
+      Wire.beginTransmission(i2cSlaveAddresses[i]);
+      for(int j = 0; j < pi[i]; j++) {
+        Wire.write(piezoIndex[i][j]);
+        if(debug) {
+          Serial.print("Sendging to slave# "); Serial.print(i, DEC);
+          Serial.print(" piezo index "); Serial.println(piezoIndex[i][j], DEC);
+        }
+      }
+      Wire.endTransmission();
+    }
+  }
+}
 
 
 /******************************
@@ -211,15 +298,13 @@ int parse_command(String com) {
     while(cont) {
       subPart = com.substring(0, com.indexOf(" "));
       subPart.trim();
-//      if(debug) Serial.print("Byte: "); Serial.println(subPart.toInt());
             
       /* Byte marker logic:
        * - if B1 (col) & start marker      -> first byte
-       * - if B1 (col) & NOT start marker  -> any B1
+       * - if B1 (col) & NOT start marker  -> any B1 (col)
        * - if B2 (raw) & stop marker       -> last byte
-       * - if B2 (raw) & NOT stop marker   -> any B2
+       * - if B2 (raw) & NOT stop marker   -> any B2 (raw)
        */
-//      if(debug) Serial.print("Working...\nbyteOne: "); Serial.println((byteOne) ? "true" : "false");
       coord = subPart.toInt();
       if(byteOne) {
         if(coord & START_MARKER_MASK) {
@@ -235,33 +320,29 @@ int parse_command(String com) {
           lastPair = false;
         }
       }
-//      if(debug) {
-//        Serial.print("firstPair: "); Serial.println((firstPair) ? "true" : "false");
-//        Serial.print("lastPair: "); Serial.println((lastPair) ? "true" : "false");
-//      }
-
       
       if(byteOne & firstPair) {
-        if(debug) Serial.println("B1 & ST");
+        if(debug) Serial.print("B1 (col) & ST --> "); Serial.println(coord, DEC);
         index = 0;
-        coordinates[index][0] = coord;
+        coordinates[index][0] = (coord & ~START_MARKER_MASK);
         byteOne = false;
       } else if(byteOne & !firstPair) {
-        if(debug) Serial.println("B1 & ...");
+        if(debug) Serial.print("B1 (col) --> "); Serial.println(coord, DEC);
         coordinates[index][0] = coord;
         byteOne = false;
       } else if(!byteOne & !lastPair) {
-        if(debug) Serial.println("B2 & ...");
+        if(debug) Serial.print("B2 (raw) --> "); Serial.println(coord, DEC);
         coordinates[index][1] = coord;
         index += 1;
         byteOne = true;
       } else if(!byteOne & lastPair) {
-        if(debug) Serial.println("B2 & SP");
-        coordinates[index][1] = coord;
+        if(debug) Serial.print("B2 (raw) & SP --> "); Serial.println(coord, DEC);
+        coordinates[index][1] = (coord & ~STOP_MARKER_MASK);
         byteOne = true;
         len = index + 1;
       } else {
         if(debug) Serial.println("ERROR in pair matching!");
+        return -1;
       }
       
       com.remove(0, com.indexOf(" ") + 1);
@@ -275,107 +356,7 @@ int parse_command(String com) {
         Serial.print("   y "); Serial.println(coordinates[i][1], DEC);
       }
     }
-  }    
-        
-        
-//      if(subPart.charAt(0) == 's') {
-//        String str = subPart;
-//        str.remove(0, 1); // Removing 's'
-//        if(debug) {
-//          Serial.print("'s' found... appending ");
-//          Serial.println(str);
-//        }
-//        
-//        if(switchOn == false) {
-//          if(debug) {
-//            Serial.print("Device standing by... waking up.\n");
-//          }
-//          reset = true;
-//          switchOn = true;
-//          setupDriver(reset, switchOn, drvGain);
-//        }
-//
-//        if((str >= String(0)) && (str <= String(9))) {
-//          if(str.toInt() < maxSlaveVal) {
-//            if(debug) {
-//              Serial.print("OK\n");
-//              Serial.print("slave = ");
-//              Serial.println(str.toInt());
-//            }
-//            
-//            slave = true;
-//          }
-//          else {
-//            if(debug) {
-//              Serial.println("Wrong value!");
-//            }
-//            
-//            cont = false;
-//          }
-//        }
-//      }
-//      else if(subPart.charAt(0) == 'x') {
-//        if(debug) {
-//          Serial.print("'x' found... exiting\n");
-//        }
-//        
-//        reset = false;
-//        switchOn = false;
-////        drvGain = 0;
-//        setupDriver(reset, switchOn, drvGain);
-//
-//        slave = false;
-//      }
-//      
-//      if(slave == true) {
-//        if((subPart >= String(0)) && (subPart <= String(9))) {
-//          if(debug) Serial.println("Valid type");
-//          if(subPart.toInt() < maxPiezoVal) {
-//            if(debug) Serial.println("Valid number");
-//            swOn[i] = subPart.toInt();
-//            i += 1;
-//            len = i;
-//          }
-//          else {
-//            if(debug) Serial.println("Invalid number! Flushing...");
-//          }
-//        }
-//        else {
-//          if(debug) Serial.println("Invalid type! Flushing...");
-//        }
-//        
-//        com.remove(0, com.indexOf(" ") + 1);
-//        
-//        if(debug) {
-//          Serial.print("subPart: ");
-//          Serial.println(subPart);
-//          Serial.print("piezo#: ");
-//          Serial.println(swOn[i-1]);
-//          Serial.print("remaining string: ");
-//          Serial.println(com);
-//        }
-//        if(com.length() <= 0) cont = false;
-//      }
-//      else {
-//        cont = false;
-//      }
-//    }
-//  
-//      if(debug) {
-//        Serial.print("Whole array: ");
-//        for(i = 0; i < len; i++) {
-//          Serial.print(swOn[i]);
-//          Serial.print(" - ");
-//        }
-//        Serial.print("\n");
-//      }
-//    }
-//    else {
-//      len = 0;
-//      cont = false;
-//    }
-//    
-//  doSwitch = true;
+  }
 
   return len; // returns the length of the parsed command line
 }
