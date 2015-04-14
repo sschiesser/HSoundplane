@@ -14,7 +14,7 @@
 #include <SPI.h>
 #include <String.h>
 
-boolean debug = true;
+boolean debug = false;
 
 /* ***************************
  *   USER-DEFINED SETTINGS   *
@@ -92,7 +92,7 @@ void setup()
   if(debug) {
     Serial.println("\nStarting up master controller...");
     Serial.println("*************************************");
-    Serial.print("serial:\n\t-port @ "); Serial.println(SERIAL_SPEED, DEC);
+    Serial.print("serial:\n\t- port @ "); Serial.println(SERIAL_SPEED, DEC);
     Serial.print("i2c:\n\t- port @ "); Serial.println((i2cFastMode) ? "400 kHz" : "100 kHz");
     Serial.print("slaves:\n\t- quantity: "); Serial.println(maxSlaveVal, DEC);
     Serial.print("\t- piezos/slave: "); Serial.println(piezoPerSlave, DEC);
@@ -270,9 +270,8 @@ int parse_command(String com) {
   boolean startMarkerSet, byteOne, firstPair, lastPair;
   
   if(debug) {
-    Serial.print("Received: ");
+    Serial.print("Received: "); Serial.println(com);
   }
-  Serial.println(com);
   if(com.length() != 0) {
     cont = true;
     byteOne = true;
