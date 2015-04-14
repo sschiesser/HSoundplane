@@ -19,7 +19,7 @@ boolean debug = true;
 /* ***************************
  *   USER-DEFINED SETTINGS   *
  * ***************************/
-#define NUMBER_OF_SLAVES 4 // number of slaves to drive (max 4)
+#define NUMBER_OF_SLAVES 1 // number of slaves to drive (max 4)
 #define COLUMNS_PER_SLAVE 8 // number of columns per slave (usually 8)
 #define PIEZO_RAWS_9 0 // piezo raws setting: 0 -> 5 items, 1 -> 9 items
 
@@ -30,7 +30,7 @@ boolean debug = true;
 
 #define I2C_FAST_MODE 1 // i2c fast mode flag: 0 -> off (100 kHz), 1 -> on (400 kHz)
 #define SLAVE_INIT_COMMAND 0xFF
-#define SERIAL_SPEED 57600
+#define SERIAL_SPEED 115200
 
 #define STARTUP_WAIT_MS 2000
 
@@ -61,23 +61,6 @@ int piezoPerSlave = COLUMNS_PER_SLAVE * piezoMod; // # piezos for each slave mod
 int maxSlaveVal = NUMBER_OF_SLAVES; // # slave modules to talk to
 int maxPiezoVal = maxSlaveVal * piezoPerSlave; // current maximum number of available piezos
 
-/* arrays of 8 x 9 piezo matrix, single addressed.
- * to combine          -> bitwise AND (&)
- * to work with 5 raws -> jump over missing piezos
- */
-//unsigned long piezoArray1[32] = {
-//  0xFFFFFFFE, 0xFFFFFFFD, 0xFFFFFFFB, 0xFFFFFFF7, 0xFFFFFFEF, 0xFFFFFFDF, 0xFFFFFFBF, 0xFFFFFF7F, 0xFFFFFEFF, // Row 1
-//  0XFFFFFDFF, 0XFFFFFBFF, 0XFFFFF7FF, 0XFFFFEFFF, 0XFFFFDFFF, 0XFFFFBFFF, 0XFFFF7FFF, 0XFFFEFFFF, 0XFFFDFFFF, // Row 2
-//  0XFFFBFFFF, 0XFFF7FFFF, 0XFFEFFFFF, 0XFFDFFFFF, 0XFFBFFFFF, 0XFF7FFFFF, 0XFEFFFFFF, 0XFDFFFFFF, 0XFBFFFFFF, // Row 3
-//  0XF7FFFFFF, 0xEFFFFFFF, 0xDFFFFFFF, 0xBFFFFFFF, 0x7FFFFFFF}; // Row 4 (5/9)
-//  
-//unsigned long piezoArray2[32] = {
-//  0xFFFFFFFE, 0xFFFFFFFD, 0xFFFFFFFB, 0xFFFFFFF7, 0xFFFFFFEF, 0xFFFFFFDF, 0xFFFFFFBF, 0xFFFFFF7F, 0xFFFFFEFF, // Row 4 - 5
-//  0XFFFFFDFF, 0XFFFFFBFF, 0XFFFFF7FF, 0XFFFFEFFF, 0XFFFFDFFF, 0XFFFFBFFF, 0XFFFF7FFF, 0XFFFEFFFF, 0XFFFDFFFF, // Row 5 - 6
-//  0XFFFBFFFF, 0XFFF7FFFF, 0XFFEFFFFF, 0XFFDFFFFF, 0XFFBFFFFF, 0XFF7FFFFF, 0XFEFFFFFF, 0XFDFFFFFF, 0XFBFFFFFF, // Row 6 - 7
-//  0XF7FFFFFF, 0xEFFFFFFF, 0xDFFFFFFF, 0xBFFFFFFF, 0x7FFFFFFF};   // Row 7 (5/9)
-//  
-//byte piezoArray3[8] = {0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F}; // Row 8
 
 
 /* ------------------------- *
@@ -107,12 +90,15 @@ void setup()
   if(i2cFastMode) Wire.setClock(400000);
 
   if(debug) {
-    Serial.println("\n\nBonjour... starting up!\n");
-    Serial.print("********************************\nAvailable slaves: "); Serial.println(maxSlaveVal);
-    Serial.print("# piezos / slave: "); Serial.println(piezoPerSlave);
-    Serial.print("  -> Max available piezos: "); Serial.println(maxPiezoVal);
-    Serial.println("********************************\n");
-    Serial.print("I2C set @"); Serial.println((i2cFastMode) ? "400 kHz" : "100 kHz");
+    Serial.println("\nStarting up master controller...");
+    Serial.println("*************************************");
+    Serial.print("serial:\n\t-port @ "); Serial.println(SERIAL_SPEED, DEC);
+    Serial.print("i2c:\n\t- port @ "); Serial.println((i2cFastMode) ? "400 kHz" : "100 kHz");
+    Serial.print("slaves:\n\t- quantity: "); Serial.println(maxSlaveVal, DEC);
+    Serial.print("\t- piezos/slave: "); Serial.println(piezoPerSlave, DEC);
+    Serial.print("\t -> available piezos: "); Serial.println(maxPiezoVal, DEC);
+    Serial.print("drivers:\n\t- gain: "); Serial.println(drv2667Gain, DEC);
+    Serial.println("**************************************\n");
   }
 
   slaves_init();
