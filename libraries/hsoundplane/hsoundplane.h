@@ -1,7 +1,13 @@
 #ifndef _HSOUNDPLANE_H
 #define _HSOUNDPLANE_H
 
+#include <Arduino.h>
+#include <SPI.h>
+#include <Wire.h>
+#include "drv2667.h"
 
+extern bool debug;
+extern SPISettings settingsA;
 
 #define I2C_SWITCH_ADDRESS 0x70	// i2c switch address (range: 0x70 - 0x77)
 #define SLAVE_INIT_COMMAND 0xFF	// first i2c message byte to announce init sequence
@@ -41,5 +47,8 @@ const uint32_t piezoArray2[32] = {
 const uint32_t piezoArray3[8] = {
 	0xFFFFFFFE, 0xFFFFFFFD, 0xFFFFFFFB, 0xFFFFFFF7, 0xFFFFFFEF, 0xFFFFFFDF, 0xFFFFFFBF, 0xFFFFFF7F};			// row 8 (8/9)
 
+
+void driverSetup(bool startup, bool on, uint8_t gain);
+uint8_t piezoSend(uint32_t val1, uint32_t val2, uint32_t val3);
 
 #endif
