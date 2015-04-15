@@ -117,7 +117,7 @@ void sendToSlave(uint8_t slaveNumber, uint8_t *message, uint8_t len);
 
 // slave functions
 void driverSetup(bool startup, bool on, uint8_t gain);
-uint8_t piezoSend(uint32_t val1, uint32_t val2, uint32_t val3);
+void piezoSend(uint32_t val1, uint32_t val2, uint32_t val3);
 
 
 #endif

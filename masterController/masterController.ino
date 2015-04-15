@@ -38,23 +38,25 @@
 /* -------------------------------------------------------------------------- */
 void setup()
 {
-  Serial.begin(SERIAL_SPEED);
-  Wire.begin(); // Start i2c
-  if(i2cFastMode) Wire.setClock(400000);
+	// Setting up communication...
+	Serial.begin(SERIAL_SPEED);
+	Wire.begin(); // Start i2c
+	if(i2cFastMode) Wire.setClock(400000);
 
-  if(debug) {
-    Serial.println("\nStarting up master controller...");
-    Serial.println("*************************************");
-    Serial.print("serial:\n\t- port @ "); Serial.println(SERIAL_SPEED, DEC);
-    Serial.print("i2c:\n\t- port @ "); Serial.println((i2cFastMode) ? "400 kHz" : "100 kHz");
-    Serial.print("slaves:\n\t- quantity: "); Serial.println(NUMBER_OF_SLAVES, DEC);
-    Serial.print("\t- piezos/slave: "); Serial.println(PIEZOS_PER_SLAVE, DEC);
-    Serial.print("\t -> available piezos: "); Serial.println(MAX_PIEZO_VAL, DEC);
-    // Serial.print("drivers:\n\t- gain: "); Serial.println(drv2667Gain, DEC);
-    Serial.println("**************************************\n");
-  }
+	if(debug) {
+		Serial.println("\nStarting up master controller...");
+		Serial.println("*************************************");
+		Serial.print("serial:\n\t- port @ "); Serial.println(SERIAL_SPEED, DEC);
+		Serial.print("i2c:\n\t- port @ "); Serial.println((i2cFastMode) ? "400 kHz" : "100 kHz");
+		Serial.print("slaves:\n\t- quantity: "); Serial.println(NUMBER_OF_SLAVES, DEC);
+		Serial.print("\t- piezos/slave: "); Serial.println(PIEZOS_PER_SLAVE, DEC);
+		Serial.print("\t -> available piezos: "); Serial.println(MAX_PIEZO_VAL, DEC);
+		// Serial.print("drivers:\n\t- gain: "); Serial.println(drv2667Gain, DEC);
+		Serial.println("**************************************\n");
+	}
 
-  slaveInit();
+	// Initializing slaves
+	slaveInit();
 }
 
 
@@ -65,28 +67,34 @@ void setup()
 /* -------------------------------------------------------------------------- */
 void loop()
 {
-  uint8_t strLength;
+	uint8_t strLength;
   
-  if(Serial.available()) {
-    char c = Serial.read();
+	// Waiting for characters on the serial port until '\n' (LF).
+	// Then process the received command line
+	if(Serial.available()) {
+		char c = Serial.read();
     
-    if(c == '\n') {
-      strLength = parseCommand(command);
-      command = "";
-      if(strLength != -1) {
-        distributeCoordinates(strLength, HScoord, piezoMatrix);
-        for(int i = 0; i < NUMBER_OF_SLAVES; i++) {
-          if(i2cSlaveAvailable[i]) {
-            sendToSlave(i2cSlaveAddresses[i], piezoMatrix[i], piCnt[i]);
-          }
-          piCnt[i] = 0;
-        }
-      }
-    }
-    else {
-      command += c;
-    }
-  }
+		if(c == '\n') {
+			strLength = parseCommand(command);
+			command = "";
+			if(strLength != -1) {
+				distributeCoordinates(strLength, HScoord, piezoMatrix);
+				for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
+					if(i2cSlaveAvailable[i]) {
+						sendToSlave(i2cSlaveAddresses[i], piezoMatrix[i], piCnt[i]);
+					}
+					piCnt[i] = 0;
+					if(debug) {
+						Serial.print("piCnt["); Serial.print(i, DEC);
+						Serial.print("]: "); Serial.println(piCnt[i], DEC);
+					}
+				}
+			}
+		}
+		else {
+			command += c;
+		}
+	}
 }
 
 
@@ -100,13 +108,14 @@ uint8_t parseCommand(String com)
 {
 	if(debug) Serial.println("Entering parser...");
 
-	String subPart; // substring used for trimming
+	String subPart;		// substring used for trimming
 	uint8_t i, piezoPairs, coord, index;
-	bool cont; // Flag to continue slicing the command string
-	boolean startMarkerSet, byteOne, firstPair, lastPair;
+	bool cont;			// Flag to continue slicing the command string
+	bool startMarkerSet, byteOne, firstPair, lastPair;
   
 	if(debug) {
-		Serial.print("Received: "); Serial.println(com);
+		Serial.print("Received: "); Serial.print(com);
+		Serial.print(" ...length: "); Serial.println(com.length());
 	}
 	if(com.length() != 0) {
 		cont = true;

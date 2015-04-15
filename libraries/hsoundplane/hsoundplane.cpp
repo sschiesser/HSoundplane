@@ -37,15 +37,15 @@
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 void slaveInit() {
-	static uint8_t i, receivedAddr;
-	static bool reset = true;
-	static bool on = true;
-	static uint8_t gain = 3;
+	uint8_t receivedAddr;
+	bool reset = true;
+	bool on = true;
+	uint8_t gain = 3;
   
 	if(debug) Serial.println("Initializing slaves...");
 
 	// Registering...
-	for(i = 0; i < NUMBER_OF_SLAVES; i++) {
+	for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
 		Wire.requestFrom(i2cSlaveAddresses[i], 1);
     
 		while(Wire.available()) {
@@ -68,7 +68,7 @@ void slaveInit() {
 	* - switch ON (0/1)
 	* - drv gain (0 - 3)
 	*/
-	for(i = 0; i < NUMBER_OF_SLAVES; i++) {
+	for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
 		if(i2cSlaveAvailable[i]) {
 			if(debug) {
 				Serial.print("Sending to 0x"); Serial.print(i2cSlaveAddresses[i], HEX);
@@ -97,45 +97,48 @@ void distributeCoordinates(	uint8_t len,
 							uint8_t orig[MAX_COORD_PAIRS][2],
 							uint8_t dest[NUMBER_OF_SLAVES][MAX_COORD_PAIRS]) {
 								
-	uint8_t mod, sn, pi;	// index modulo, slave number, piezo index
+	uint8_t mod, sn, pi;		// index modulo, slave number, piezo index
 
 	if(debug) Serial.println("Distributing coordinates...");
 	
 	for(uint8_t i = 0; i < len; i++) {
 		// check column value of a pair and assign it to the corresponding slave
 		if(orig[i][0] < COLUMNS_PER_SLAVE) {
-			uint8_t slaveAddress = i2cSlaveAddresses[0];
+			static uint8_t slaveAddress = i2cSlaveAddresses[0];
 			mod = 0;
 			sn = 0;
 		} else if(orig[i][0] < (2 * COLUMNS_PER_SLAVE)) {
-			uint8_t slaveAddress = i2cSlaveAddresses[1];
+			static uint8_t slaveAddress = i2cSlaveAddresses[1];
 			mod = COLUMNS_PER_SLAVE;
 			sn = 1;
 		} else if(orig[i][0] < (3 * COLUMNS_PER_SLAVE)) {
-			uint8_t slaveAddress = i2cSlaveAddresses[2];
+			static uint8_t slaveAddress = i2cSlaveAddresses[2];
 			mod = 2 * COLUMNS_PER_SLAVE;
 			sn = 2;
 		} else if(orig[i][0] < (4 * COLUMNS_PER_SLAVE)) {
-			uint8_t slaveAddress = i2cSlaveAddresses[3];
+			static uint8_t slaveAddress = i2cSlaveAddresses[3];
 			mod = 3 * COLUMNS_PER_SLAVE;
 			sn = 3;
 		}
 		
-		// calculate the linear position (piezo index) of the pair
-		// and save it as next item of the selected slave of 'piezoMatrix'.
-		// !! always multiply by 9!! Not connected piezo will be skipped.
-		pi = ((orig[i][0] - mod) * 9) + (orig[i][1] * 2);
-		piezoMatrix[sn][piCnt[sn]] = pi;
-		piCnt[sn] += 1;	// increment the pi counter of the selected slave
+		// work only for available devices
+		if(i2cSlaveAvailable[sn]) {
+			// calculate the linear position (piezo index) of the pair
+			// and save it as next item of the selected slave of 'piezoMatrix'.
+			// !! always multiply by 9!! Not connected piezo will be skipped.
+			pi = ((orig[i][0] - mod) * 9) + (orig[i][1] * 2);
+			piezoMatrix[sn][piCnt[sn]] = pi;
+			piCnt[sn] += 1;	// increment the pi counter of the selected slave
 		
-		if(debug) {
-			uint8_t pi5 = ((orig[i][0] - mod) * 5) + orig[i][1];
-			Serial.print("Slave#: "); Serial.print(sn);
-			Serial.print(" Piezo#: "); Serial.print(pi);
-			Serial.print("("); Serial.print(pi5); Serial.println(")");
+			if(debug) {
+				uint8_t pi5 = ((orig[i][0] - mod) * 5) + orig[i][1];
+				Serial.print("Slave#: "); Serial.print(sn);
+				Serial.print(" Piezo#: "); Serial.print(pi);
+				Serial.print("("); Serial.print(pi5); Serial.println(")");
       
-			Serial.print("piezoMatrix: "); Serial.print(piezoMatrix[sn][piCnt[sn]-1], DEC);
-			Serial.print("... pi: "); Serial.println(piCnt[sn]-1);
+				Serial.print("piezoMatrix: "); Serial.print(piezoMatrix[sn][piCnt[sn]-1], DEC);
+				Serial.print("... piCnt: "); Serial.println(piCnt[sn]-1);
+			}
 		}
 	}
 }
@@ -153,7 +156,7 @@ void sendToSlave(uint8_t sn, uint8_t *mes, uint8_t len) {
   }
   
   Wire.beginTransmission(sn);		// address slave @ address sn
-  for(int i = 0; i < len; i++) {
+  for(uint8_t i = 0; i < len; i++) {
     if(debug) {
       Serial.print(mes[i], DEC);
       if(i < (len-1)) Serial.print(" - ");
@@ -177,7 +180,9 @@ void driverSetup(bool startup, bool on, uint8_t gain) {
 	// initialization...
 	if(startup) {
 		if(debug) Serial.println("Starting up DRV2667...\n- addressing i2c switch");
-		Wire.beginTransmission(I2C_SWITCH_ADDRESS);
+
+		// open each i2c switch channel and send reset command to the attached drv2667
+		Wire.beginTransmission(I2C_SWITCH_ADDRESS);		
 		for(uint8_t i = 0; i < 8; i++) {
 			if(debug) Serial.print("- opening switch #"); Serial.println(i, DEC);
 			Wire.write((uint8_t)(1 << i));
@@ -194,6 +199,8 @@ void driverSetup(bool startup, bool on, uint8_t gain) {
 	// switch on...
 	if(on) {
 		if(debug) Serial.println("Switching on...\n- addressing i2c switch");
+
+		// open each i2c switch channel and send settings to the attached drv2667
 		Wire.beginTransmission(I2C_SWITCH_ADDRESS);
 		for(uint8_t i = 0; i < 8; i++) {
 			if(debug) Serial.print("- opening switch #"); Serial.println(i, DEC);
@@ -216,15 +223,17 @@ void driverSetup(bool startup, bool on, uint8_t gain) {
 			Wire.write(DRV2667_REG02);
 			Wire.write(EN_OVERRIDE);
 			if(Wire.endTransmission() == 0) {
-				digitalWrite(LED2_PIN, LED_ON);
+				digitalWrite(LED2_PIN, LED_ON);			// notify driver on status
 				if(debug) Serial.println("SUCCESS!");
 			} else {
-				digitalWrite(LED2_PIN, LED_OFF);
+				digitalWrite(LED2_PIN, LED_OFF);		// driver NOT on -> error
 				if(debug) Serial.println("ERROR!");
 			}
 		}
 	} else { // switching off...
 		if(debug) Serial.println("Switching off...\n- addressing i2c switch");
+		
+		// open each i2c switch channel and send standby command to the attached drv2667
 		Wire.beginTransmission(I2C_SWITCH_ADDRESS);
 		for(uint8_t i = 0; i < 8; i++) {
 			if(debug) Serial.print("- opening switch #"); Serial.println(i, DEC);
@@ -236,10 +245,10 @@ void driverSetup(bool startup, bool on, uint8_t gain) {
 			Wire.write(DRV2667_REG02);
 			Wire.write(STANDBY);
 			if(Wire.endTransmission() == 0) {
-				digitalWrite(LED2_PIN, LED_OFF);
+				digitalWrite(LED2_PIN, LED_OFF);		// notify driver off status
 				if(debug) Serial.println("SUCCESS!");
 			} else {
-				digitalWrite(LED2_PIN, LED_ON);
+				digitalWrite(LED2_PIN, LED_ON);			// driver NOT off -> error
 				if(debug) Serial.println("ERROR!");
 			}
 		}
@@ -251,16 +260,14 @@ void driverSetup(bool startup, bool on, uint8_t gain) {
 /* | piezoSend																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-uint8_t piezoSend(uint32_t val1, uint32_t val2, uint32_t val3) {
-	digitalWrite(LED3_PIN, LOW);	// notify SPI activity
-	digitalWrite(LOAD_PIN, LOW);	// prepare LOAD pin
-	digitalWrite(CLR_PIN, LOW);		// reset all shift registers
-	digitalWrite(CLR_PIN, HIGH);	// ...
-	// digitalWrite(LOAD_PIN, HIGH);	// generate LOAD clock rising edge
-	// digitalWrite(LOAD_PIN, LOW);	// ...
+void piezoSend(uint32_t val1, uint32_t val2, uint32_t val3) {
+	digitalWrite(LED3_PIN, LOW);		// notify SPI activity
+	digitalWrite(LOAD_PIN, LOW);		// prepare LOAD pin
+	digitalWrite(CLR_PIN, LOW);			// reset all shift registers
+	digitalWrite(CLR_PIN, HIGH);		// ...
 	
-	SPI.beginTransaction(settingsA);
-	SPI.transfer(val3);
+	SPI.beginTransaction(settingsA);	// start the SPI transaction with saved settings
+	SPI.transfer((uint8_t)(val3));
 	SPI.transfer((uint8_t)(val2 >> 24));
 	SPI.transfer((uint8_t)(val2 >> 16));
 	SPI.transfer((uint8_t)(val2 >> 8));
@@ -270,15 +277,6 @@ uint8_t piezoSend(uint32_t val1, uint32_t val2, uint32_t val3) {
 	SPI.transfer((uint8_t)(val1 >> 8));
 	SPI.transfer((uint8_t)(val1));
 	SPI.endTransaction();
-	// shiftOut(MOSI_PIN, SCK_PIN, MSBFIRST, val3);
-	// shiftOut(MOSI_PIN, SCK_PIN, MSBFIRST, (uint8_t)(val2 >> 24));
-	// shiftOut(MOSI_PIN, SCK_PIN, MSBFIRST, (uint8_t)(val2 >> 16));
-	// shiftOut(MOSI_PIN, SCK_PIN, MSBFIRST, (uint8_t)(val2 >> 8));
-	// shiftOut(MOSI_PIN, SCK_PIN, MSBFIRST, (uint8_t)(val2));
-	// shiftOut(MOSI_PIN, SCK_PIN, MSBFIRST, (uint8_t)(val1 >> 24));
-	// shiftOut(MOSI_PIN, SCK_PIN, MSBFIRST, (uint8_t)(val1 >> 16));
-	// shiftOut(MOSI_PIN, SCK_PIN, MSBFIRST, (uint8_t)(val1 >> 8));
-	// shiftOut(MOSI_PIN, SCK_PIN, MSBFIRST, (uint8_t)(val1));
 	
 	if(debug) {
 		Serial.print("Sending to shift registers:\nb'");
@@ -292,13 +290,17 @@ uint8_t piezoSend(uint32_t val1, uint32_t val2, uint32_t val3) {
 		Serial.print((uint8_t)(val1 >> 8), BIN); Serial.print(" ");
 		Serial.print((uint8_t)(val1), BIN); Serial.println("'");
 		
-		Serial.print("0x"); Serial.print((uint8_t)val3, HEX);
-		Serial.print("\t0x"); Serial.print(val2, HEX);
-		Serial.print("\t0x"); Serial.println(val1, HEX);
+		Serial.print("0x   "); Serial.print((uint8_t)val3, HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val2 >> 24), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val2 >> 16), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val2 >> 8), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val2), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val1 >> 24), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val1 >> 16), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val1 >> 8), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val1), HEX);
 	}
 	
-	digitalWrite(LOAD_PIN, HIGH);	// generate rising edge on LOAD pin
-	digitalWrite(LED3_PIN, HIGH);
-	
-	return 0;
+	digitalWrite(LOAD_PIN, HIGH);		// generate rising edge on LOAD pin
+	digitalWrite(LED3_PIN, HIGH);		// stop SPI activity notification
 }

@@ -99,8 +99,9 @@ void setup()
 			delay(50);
 		}
 	}
-  
-	digitalWrite(LED1_PIN, LED_ON); // announcing startup done...
+	
+	// announcing startup done...
+	digitalWrite(LED1_PIN, LED_ON);
 	digitalWrite(LED2_PIN, LED_OFF);
 	digitalWrite(LED3_PIN, LED_OFF);
 }
@@ -125,7 +126,8 @@ void loop()
 void requestEvent()
 {
 	if(debug) {
-		Serial.print("i2c registration request received... sending own address 0x"); Serial.println(I2C_SLAVE_ADDRESS, HEX);
+		Serial.print("i2c registration request received... sending own address 0x");
+		Serial.println(I2C_SLAVE_ADDRESS, HEX);
 	}
 	Wire.write(I2C_SLAVE_ADDRESS);
 }
@@ -143,28 +145,31 @@ void receiveEvent(int howmany)
 	uint32_t piezoVal3 = 0xFFFFFFFF;
   
 	if(debug) {
-		Serial.print("i2c message received... length: "); Serial.println(howmany, DEC);
+		Serial.print("i2c message received... length: ");
+		Serial.println(howmany, DEC);
 	}
 	
+	// receive the first byte and check if it's an initialization request
 	uint8_t received = Wire.read();
 	if(received == SLAVE_INIT_COMMAND) {
-		bool drv2667Reset = (Wire.read() == 1) ? true : false;
-		bool drv2667SwitchOn = (Wire.read() == 1) ? true : false;
-		uint8_t drv2667Gain = Wire.read();
+		bool reset = (Wire.read() == 1) ? true : false;
+		bool on = (Wire.read() == 1) ? true : false;
+		uint8_t gain = Wire.read();
 		if(debug) {
 			Serial.print("INIT: ");
-			Serial.print("reset - "); Serial.print((drv2667Reset) ? "true" : "false");
+			Serial.print("reset - "); Serial.print((reset) ? "true" : "false");
 			Serial.print(" / ");
-			Serial.print("switch on - "); Serial.print((drv2667SwitchOn) ? "true" : "false");
+			Serial.print("switch on - "); Serial.print((on) ? "true" : "false");
 			Serial.print(" / ");
-			Serial.print("gain - "); Serial.println(drv2667Gain, DEC);
+			Serial.print("gain - "); Serial.println(gain, DEC);
 			Serial.println("");
 		}
-		   driverSetup(drv2667Reset, drv2667SwitchOn, drv2667Gain);
+		// driverSetup(reset, on, gain);
 	} else {
+		// receive all sent bytes and set (bitwise AND) the piezo bismasks
 		uint8_t decount = howmany;
 		while(decount > 0) {
-			Serial.print("Received "); Serial.print(received, DEC);
+			if(debug) Serial.print("Received "); Serial.print(received, DEC);
 			if(received < 32) {
 				piezoVal1 &= piezoArray1[received];
 				if(debug) Serial.print("\t-> piezoVal1: 0x"); Serial.println(piezoVal1, HEX);
@@ -181,6 +186,8 @@ void receiveEvent(int howmany)
 			decount--;
 		}
 		if(debug) Serial.println("");
+		
+		// send the piezo bitmasks to the shift registers
 		piezoSend(piezoVal1, piezoVal2, piezoVal3);
 	}
 }

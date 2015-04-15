@@ -43,6 +43,8 @@
 
 #define STARTUP_WAIT_MS		2000		// startup waiting time to let the slaves be ready
 
+#define SYNC_PIN_1			2			// pin used to measure time between events
+
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */

@@ -49,7 +49,7 @@
 /* | VARIABLES																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool debug = true;				// DEBUG FLAG!!
+bool debug = false;				// DEBUG FLAG!!
 
 #if(I2C_FAST_MODE > 0)			// i2c speed flag
 	bool i2cFastMode = true;
