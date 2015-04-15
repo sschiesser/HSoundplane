@@ -1,12 +1,41 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  This file is part of HSoundplane library
+//
+//	Works with the following hardware (150415):
+//		- Soundplane piezo-driver v0.95 - R003
+//		- Soundplane piezo-layer v.095 - R006
+//
+//  Copyright (c) 2015, www.icst.net
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy of 
+//  this software and associated documentation files (the "Software"), to deal in 
+//  the Software without restriction, including without limitation the rights to use, 
+//  copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the 
+//  Software, and to permit persons to whom the Software is furnished to do so, 
+//  subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all 
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+//  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
+//  PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
+//  HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION 
+//  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+//  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 #include <Wire.h>
 #include <SPI.h>
 #include <String.h>
 #include "HSoundplane.h"
 #include "masterSettings.h"
 
-/******************************
- **          SETUP           **
- ******************************/
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | setup																	| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 void setup()
 {
   Serial.begin(SERIAL_SPEED);
@@ -29,9 +58,11 @@ void setup()
 }
 
 
-/******************************
- **           LOOP           **
- ******************************/
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | loop																	| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 void loop()
 {
   uint8_t strLength;
@@ -43,12 +74,12 @@ void loop()
       strLength = parseCommand(command);
       command = "";
       if(strLength != -1) {
-        distributeCoordinates(strLength);
+        distributeCoordinates(strLength, HScoord, piezoMatrix);
         for(int i = 0; i < NUMBER_OF_SLAVES; i++) {
           if(i2cSlaveAvailable[i]) {
-            sendToSlave(i2cSlaveAddresses[i], piezoIndex[i], pi[i]);
+            sendToSlave(i2cSlaveAddresses[i], piezoMatrix[i], piCnt[i]);
           }
-          // pi[i] = 0;
+          piCnt[i] = 0;
         }
       }
     }
@@ -60,7 +91,13 @@ void loop()
 
 
 
-int parseCommand(String com) {
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | parseCommand															| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+uint8_t parseCommand(String com)
+{
 	if(debug) Serial.println("Entering parser...");
 
 	String subPart; // substring used for trimming
@@ -105,20 +142,20 @@ int parseCommand(String com) {
 			if(byteOne & firstPair) {
 				if(debug) Serial.print("B1 (col) & ST --> "); Serial.println(coord, DEC);
 				index = 0;
-				coordinates[index][0] = (coord & ~START_MARKER_MASK);
+				HScoord[index][0] = (coord & ~START_MARKER_MASK);
 				byteOne = false;
 			} else if(byteOne & !firstPair) {
 				if(debug) Serial.print("B1 (col) --> "); Serial.println(coord, DEC);
-				coordinates[index][0] = coord;
+				HScoord[index][0] = coord;
 				byteOne = false;
 			} else if(!byteOne & !lastPair) {
 				if(debug) Serial.print("B2 (raw) --> "); Serial.println(coord, DEC);
-				coordinates[index][1] = coord;
+				HScoord[index][1] = coord;
 				index += 1;
 				byteOne = true;
 			} else if(!byteOne & lastPair) {
 				if(debug) Serial.print("B2 (raw) & SP --> "); Serial.println(coord, DEC);
-				coordinates[index][1] = (coord & ~STOP_MARKER_MASK);
+				HScoord[index][1] = (coord & ~STOP_MARKER_MASK);
 				byteOne = true;
 				piezoPairs = index + 1;
 			} else {
@@ -133,8 +170,8 @@ int parseCommand(String com) {
 		if(debug) {
 			Serial.print("Coordinates table (#pairs: "); Serial.print(piezoPairs); Serial.println("):");
 			for(i = 0; i < piezoPairs; i++) {
-				Serial.print("x "); Serial.print(coordinates[i][0], DEC);
-				Serial.print("   y "); Serial.println(coordinates[i][1], DEC);
+				Serial.print("x "); Serial.print(HScoord[i][0], DEC);
+				Serial.print("   y "); Serial.println(HScoord[i][1], DEC);
 			}
 		}
 	}
