@@ -30,13 +30,13 @@ boolean debug = true;
 /* ------------------------- *
  * Parsing command variables *
  * --------------------------*/
-#if(PIEZO_RAWS_9 > 0)
-  boolean piezoRaw9 = true;
-  const int arrayItems = NUMBER_OF_COLUMNS * 9;
-#else
-  boolean piezoRaw9 = false;
-  const int arrayItems = NUMBER_OF_COLUMNS * 5;
-#endif
+// #if(PIEZO_RAWS_9 > 0)
+//   boolean piezoRaw9 = true;
+//   const int arrayItems = NUMBER_OF_COLUMNS * 9;
+// #else
+//   boolean piezoRaw9 = false;
+//   const int arrayItems = NUMBER_OF_COLUMNS * 5;
+// #endif
 
 int piezoPerSlave = (piezoRaw9) ? (NUMBER_OF_COLUMNS * 9) : (NUMBER_OF_COLUMNS * 5);
 int maxSlaveVal = NUMBER_OF_SLAVES;

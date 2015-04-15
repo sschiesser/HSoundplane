@@ -1,14 +1,14 @@
 #include <Wire.h>
 #include <SPI.h>
 #include "drv2667.h"
-#include "hsoundplane.h"
+#include "HSoundplane.h"
 #include "slaveSettings.h"
 
-/* -------------------------------------------------------------- */
-/* -------------------------------------------------------------- */
-/* | SETUP														| */
-/* -------------------------------------------------------------- */
-/* -------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | SETUP																	| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 void setup() {
 	// Starting communication
 	Serial.begin(SERIAL_SPEED); // Serial...
@@ -59,40 +59,40 @@ void setup() {
 		Serial.println("*************************************\n");
 
 		for(uint8_t i = 0; i < 3; i++) {
-			digitalWrite(LED1_PIN, LOW);
-			digitalWrite(LED2_PIN, HIGH);
-			digitalWrite(LED3_PIN, HIGH);
+			digitalWrite(LED1_PIN, LED_ON);
+			digitalWrite(LED2_PIN, LED_OFF);
+			digitalWrite(LED3_PIN, LED_OFF);
 			delay(50);
-			digitalWrite(LED1_PIN, HIGH);
-			digitalWrite(LED2_PIN, LOW);
+			digitalWrite(LED1_PIN, LED_OFF);
+			digitalWrite(LED2_PIN, LED_ON);
 			delay(50);
-			digitalWrite(LED2_PIN, HIGH);
-			digitalWrite(LED3_PIN, LOW);
+			digitalWrite(LED2_PIN, LED_OFF);
+			digitalWrite(LED3_PIN, LED_ON);
 			delay(50);
 		}
 	}
   
-	digitalWrite(LED1_PIN, LOW); // announcing startup done...
-	digitalWrite(LED2_PIN, HIGH);
-	digitalWrite(LED3_PIN, HIGH);
+	digitalWrite(LED1_PIN, LED_ON); // announcing startup done...
+	digitalWrite(LED2_PIN, LED_OFF);
+	digitalWrite(LED3_PIN, LED_OFF);
 }
 
 
-/* -------------------------------------------------------------- */
-/* -------------------------------------------------------------- */
-/* | LOOP														| */
-/* -------------------------------------------------------------- */
-/* -------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | LOOP																	| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 void loop() {
 	delay(1);
 }
 
 
-/* -------------------------------------------------------------- */
-/* -------------------------------------------------------------- */
-/* | I2C REQUEST EVENT											| */
-/* -------------------------------------------------------------- */
-/* -------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | I2C REQUEST EVENT														| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 void requestEvent() {
 	if(debug) {
 		Serial.print("i2c registration request received... sending own address 0x"); Serial.println(I2C_SLAVE_ADDRESS, HEX);
@@ -101,11 +101,11 @@ void requestEvent() {
 }
 
 
-/* -------------------------------------------------------------- */
-/* -------------------------------------------------------------- */
-/* | I2C RECEIVE EVENT											| */
-/* -------------------------------------------------------------- */
-/* -------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | I2C RECEIVE EVENT														| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
 void receiveEvent(int howmany) {
 	uint32_t piezoVal1 = 0xFFFFFFFF;
 	uint32_t piezoVal2 = 0xFFFFFFFF;
@@ -116,10 +116,10 @@ void receiveEvent(int howmany) {
 	}
 	
 	uint8_t received = Wire.read();
-	if(received == initCommand) {
-		drv2667Reset = (Wire.read() == 1) ? true : false;
-		drv2667SwitchOn = (Wire.read() == 1) ? true : false;
-		drv2667Gain = Wire.read();
+	if(received == SLAVE_INIT_COMMAND) {
+		bool drv2667Reset = (Wire.read() == 1) ? true : false;
+		bool drv2667SwitchOn = (Wire.read() == 1) ? true : false;
+		uint8_t drv2667Gain = Wire.read();
 		if(debug) {
 			Serial.print("INIT: ");
 			Serial.print("reset - "); Serial.print((drv2667Reset) ? "true" : "false");
@@ -153,82 +153,3 @@ void receiveEvent(int howmany) {
 		piezoSend(piezoVal1, piezoVal2, piezoVal3);
 	}
 }
-
-
-/* -------------------------------------------------------------- */
-/* -------------------------------------------------------------- */
-/* | DRIVERS SETUP												| */
-/* -------------------------------------------------------------- */
-/* -------------------------------------------------------------- */
-// void drivers_setup(bool startup, bool on, uint8_t gain) {
-// 	// initialization...
-// 	if(startup) {
-// 		if(debug) Serial.println("Starting up DRV2667...\n- addressing i2c switch");
-// 		Wire.beginTransmission(I2C_SWITCH_ADDRESS);
-// 		for(uint8_t i = 0; i < 8; i++) {
-// 			if(debug) Serial.print("- opening switch #"); Serial.println(i, DEC);
-// 			Wire.write((uint8_t)(1 << i));
-// 			Wire.endTransmission();
-//
-// 			if(debug) Serial.println("- resetting device");
-// 			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
-// 			Wire.write(DRV2667_REG02);
-// 			Wire.write(DEV_RST);
-// 			Wire.endTransmission();
-// 		}
-// 	}
-//
-// 	// switch on...
-// 	if(on) {
-// 		if(debug) Serial.println("Switching on...\n- addressing i2c switch");
-// 		Wire.beginTransmission(I2C_SWITCH_ADDRESS);
-// 		for(uint8_t i = 0; i < 8; i++) {
-// 			if(debug) Serial.print("- opening switch #"); Serial.println(i, DEC);
-// 			Wire.write((uint8_t)(1 << i));
-// 			Wire.endTransmission();
-//
-// 			if(debug) Serial.println("- waking up");
-// 			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
-// 			Wire.write(DRV2667_REG02);
-// 			Wire.write(GO);
-//
-// 			if(debug) Serial.print("- setting MUX and GAIN to 0x:"); Serial.println((INPUT_MUX | drv2667Gain), HEX);
-// 			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
-// 			Wire.write(DRV2667_REG01);
-// 			Wire.write(INPUT_MUX | drv2667Gain);
-// 			Wire.endTransmission();
-//
-// 			if(debug) Serial.println("- enabling amplifier");
-// 			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
-// 			Wire.write(DRV2667_REG02);
-// 			Wire.write(EN_OVERRIDE);
-// 			if(Wire.endTransmission() == 0) {
-// 				digitalWrite(LED2_PIN, LOW);
-// 				if(debug) Serial.println("SUCCESS!");
-// 			} else {
-// 				digitalWrite(LED2_PIN, HIGH);
-// 				if(debug) Serial.println("ERROR!");
-// 			}
-// 		}
-// 	} else { // switching off...
-// 		if(debug) Serial.println("Switching off...\n- addressing i2c switch");
-// 		Wire.beginTransmission(I2C_SWITCH_ADDRESS);
-// 		for(uint8_t i = 0; i < 8; i++) {
-// 			if(debug) Serial.print("- opening switch #"); Serial.println(i, DEC);
-// 			Wire.write((uint8_t)(1 << i));
-// 			Wire.endTransmission();
-//
-// 			if(debug) Serial.println("- standing by");
-// 			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
-// 			Wire.write(DRV2667_REG02);
-// 			Wire.write(STANDBY);
-// 			if(Wire.endTransmission() == 0) {
-// 				digitalWrite(LED2_PIN, HIGH);
-// 				if(debug) Serial.println("SUCCESS!");
-// 			} else {
-// 				digitalWrite(LED2_PIN, LOW);
-// 				if(debug) Serial.println("ERROR!");
-// 			}
-// 		}
-// 	}
-// }
