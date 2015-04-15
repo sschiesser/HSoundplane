@@ -42,7 +42,9 @@ void slaveInit() {
 	bool on = true;
 	uint8_t gain = 3;
   
-	if(debug) Serial.println("Initializing slaves...");
+	if(debug) {
+		Serial.println("Initializing slaves...");
+	}
 
 	// Registering...
 	for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
@@ -99,7 +101,9 @@ void distributeCoordinates(	uint8_t len,
 								
 	uint8_t mod, sn, pi;		// index modulo, slave number, piezo index
 
-	if(debug) Serial.println("Distributing coordinates...");
+	if(debug) {
+		Serial.println("Distributing coordinates...");
+	}
 	
 	for(uint8_t i = 0; i < len; i++) {
 		// check column value of a pair and assign it to the corresponding slave
@@ -163,7 +167,9 @@ void sendToSlave(uint8_t sn, uint8_t *mes, uint8_t len) {
     }
     Wire.write(mes[i]);				// send all indexes associated to this slave
   }
-  if(debug) Serial.println("");
+  if(debug) {
+	  Serial.println("");
+  }
   Wire.endTransmission();
 }
 
@@ -179,16 +185,22 @@ void sendToSlave(uint8_t sn, uint8_t *mes, uint8_t len) {
 void driverSetup(bool startup, bool on, uint8_t gain) {
 	// initialization...
 	if(startup) {
-		if(debug) Serial.println("Starting up DRV2667...\n- addressing i2c switch");
+		if(debug) {
+			Serial.println("Starting up DRV2667...\n- addressing i2c switch");
+		}
 
 		// open each i2c switch channel and send reset command to the attached drv2667
 		Wire.beginTransmission(I2C_SWITCH_ADDRESS);		
 		for(uint8_t i = 0; i < 8; i++) {
-			if(debug) Serial.print("- opening switch #"); Serial.println(i, DEC);
+			if(debug) {
+				Serial.print("- opening switch #"); Serial.println(i, DEC);
+			}
 			Wire.write((uint8_t)(1 << i));
 			Wire.endTransmission();
       
-			if(debug) Serial.println("- resetting device");
+			if(debug) {
+				Serial.println("- resetting device");
+			}
 			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
 			Wire.write(DRV2667_REG02);
 			Wire.write(DEV_RST);
@@ -198,45 +210,63 @@ void driverSetup(bool startup, bool on, uint8_t gain) {
   
 	// switch on...
 	if(on) {
-		if(debug) Serial.println("Switching on...\n- addressing i2c switch");
+		if(debug) {
+			Serial.println("Switching on...\n- addressing i2c switch");
+		}
 
 		// open each i2c switch channel and send settings to the attached drv2667
 		Wire.beginTransmission(I2C_SWITCH_ADDRESS);
 		for(uint8_t i = 0; i < 8; i++) {
-			if(debug) Serial.print("- opening switch #"); Serial.println(i, DEC);
+			if(debug) {
+				Serial.print("- opening switch #"); Serial.println(i, DEC);
+			}
 			Wire.write((uint8_t)(1 << i));
 			Wire.endTransmission();
       
-			if(debug) Serial.println("- waking up");
+			if(debug) {
+				Serial.println("- waking up");
+			}
 			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
 			Wire.write(DRV2667_REG02);
 			Wire.write(GO);
       
-			if(debug) Serial.print("- setting MUX and GAIN to 0x:"); Serial.println((INPUT_MUX | gain), HEX);
+			if(debug) {
+				Serial.print("- setting MUX and GAIN to 0x:"); Serial.println((INPUT_MUX | gain), HEX);
+			}
 			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
 			Wire.write(DRV2667_REG01);
 			Wire.write(INPUT_MUX | gain);
 			Wire.endTransmission();
       
-			if(debug) Serial.println("- enabling amplifier");
+			if(debug) {
+				Serial.println("- enabling amplifier");
+			}
 			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
 			Wire.write(DRV2667_REG02);
 			Wire.write(EN_OVERRIDE);
 			if(Wire.endTransmission() == 0) {
 				digitalWrite(LED2_PIN, LED_ON);			// notify driver on status
-				if(debug) Serial.println("SUCCESS!");
+				if(debug) {
+					Serial.println("SUCCESS!");
+				}
 			} else {
 				digitalWrite(LED2_PIN, LED_OFF);		// driver NOT on -> error
-				if(debug) Serial.println("ERROR!");
+				if(debug) {
+					Serial.println("ERROR!");
+				}
 			}
 		}
 	} else { // switching off...
-		if(debug) Serial.println("Switching off...\n- addressing i2c switch");
+		if(debug) {
+			Serial.println("Switching off...\n- addressing i2c switch");
+		}
 		
 		// open each i2c switch channel and send standby command to the attached drv2667
 		Wire.beginTransmission(I2C_SWITCH_ADDRESS);
 		for(uint8_t i = 0; i < 8; i++) {
-			if(debug) Serial.print("- opening switch #"); Serial.println(i, DEC);
+			if(debug) {
+				Serial.print("- opening switch #"); Serial.println(i, DEC);
+			}
 			Wire.write((uint8_t)(1 << i));
 			Wire.endTransmission();
       
@@ -246,10 +276,14 @@ void driverSetup(bool startup, bool on, uint8_t gain) {
 			Wire.write(STANDBY);
 			if(Wire.endTransmission() == 0) {
 				digitalWrite(LED2_PIN, LED_OFF);		// notify driver off status
-				if(debug) Serial.println("SUCCESS!");
+				if(debug) {
+					Serial.println("SUCCESS!");
+				}
 			} else {
 				digitalWrite(LED2_PIN, LED_ON);			// driver NOT off -> error
-				if(debug) Serial.println("ERROR!");
+				if(debug) {
+					Serial.println("ERROR!");
+				}
 			}
 		}
 	}

@@ -35,13 +35,15 @@
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 // TO CHANGE FOR EACH SLAVE
-#define I2C_SLAVE_ADDRESS 0x51	// own i2c slave address to respond to
+#define I2C_SLAVE_ADDRESS	0x51		// own i2c slave address to respond to
 
 // GENERAL SLAVE SETTINGS
-#define I2C_FAST_MODE 1			// 0 -> standad mode (100 kHz) i2c,
-								// 1 -> fast mode (400 kHz)
-#define SERIAL_SPEED 115200		// serial communication speed for debugging
-#define SPI_SPEED 2000000 		// SPI communication speed for shift registers
+#define I2C_FAST_MODE		1			// 0 -> standad mode (100 kHz) i2c,
+										// 1 -> fast mode (400 kHz)
+#define SERIAL_SPEED		115200		// serial communication speed for debugging
+#define SPI_SPEED			2000000		// SPI communication speed for shift registers
+
+#define SYNC_PIN_1			2			// pin used to measure time between events
 
 
 /* -------------------------------------------------------------------------- */
@@ -59,6 +61,7 @@ bool debug = false;				// DEBUG FLAG!!
 
 SPISettings settingsA(SPI_SPEED, MSBFIRST, SPI_MODE0);	// SPI settings
 
+bool syncPinState = false;
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */

@@ -42,6 +42,10 @@ void setup()
 	Serial.begin(SERIAL_SPEED);
 	Wire.begin(); // Start i2c
 	if(i2cFastMode) Wire.setClock(400000);
+	
+	// setting up sync pin(s)
+	pinMode(SYNC_PIN_1, OUTPUT);
+	digitalWrite(SYNC_PIN_1, syncPinState);
 
 	if(debug) {
 		Serial.println("\nStarting up master controller...");
@@ -75,7 +79,11 @@ void loop()
 		char c = Serial.read();
     
 		if(c == '\n') {
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
 			strLength = parseCommand(command);
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);		// measure parsing time
 			command = "";
 			if(strLength != -1) {
 				distributeCoordinates(strLength, HScoord, piezoMatrix);
@@ -106,7 +114,9 @@ void loop()
 /* -------------------------------------------------------------------------- */
 uint8_t parseCommand(String com)
 {
-	if(debug) Serial.println("Entering parser...");
+	if(debug) {
+		Serial.println("Entering parser...");
+	}
 
 	String subPart;		// substring used for trimming
 	uint8_t i, piezoPairs, coord, index;
@@ -149,26 +159,36 @@ uint8_t parseCommand(String com)
 			}
       
 			if(byteOne & firstPair) {
-				if(debug) Serial.print("B1 (col) & ST --> "); Serial.println(coord, DEC);
+				if(debug) {
+					Serial.print("B1 (col) & ST --> "); Serial.println(coord, DEC);
+				}
 				index = 0;
 				HScoord[index][0] = (coord & ~START_MARKER_MASK);
 				byteOne = false;
 			} else if(byteOne & !firstPair) {
-				if(debug) Serial.print("B1 (col) --> "); Serial.println(coord, DEC);
+				if(debug) {
+					Serial.print("B1 (col) --> "); Serial.println(coord, DEC);
+				}
 				HScoord[index][0] = coord;
 				byteOne = false;
 			} else if(!byteOne & !lastPair) {
-				if(debug) Serial.print("B2 (raw) --> "); Serial.println(coord, DEC);
+				if(debug) {
+					Serial.print("B2 (raw) --> "); Serial.println(coord, DEC);
+				}
 				HScoord[index][1] = coord;
 				index += 1;
 				byteOne = true;
 			} else if(!byteOne & lastPair) {
-				if(debug) Serial.print("B2 (raw) & SP --> "); Serial.println(coord, DEC);
+				if(debug) {
+					Serial.print("B2 (raw) & SP --> "); Serial.println(coord, DEC);
+				}
 				HScoord[index][1] = (coord & ~STOP_MARKER_MASK);
 				byteOne = true;
 				piezoPairs = index + 1;
 			} else {
-				if(debug) Serial.println("ERROR in pair matching!");
+				if(debug) {
+					Serial.println("ERROR in pair matching!");
+				}
 				return -1;
 			}
       

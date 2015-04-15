@@ -58,6 +58,8 @@ bool debug = false;						// DEBUG FLAG!!
 #else
   bool i2cFastMode = false;
 #endif
+  
+bool syncPinState = false;
 
 String command;							// serial command to parse
 

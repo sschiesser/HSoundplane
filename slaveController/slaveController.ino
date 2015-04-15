@@ -65,6 +65,8 @@ void setup()
 	pinMode(SW_ADDR_0, OUTPUT);			// i2c switch address
 	pinMode(SW_ADDR_1, OUTPUT);
 	pinMode(SW_ADDR_2, OUTPUT);  
+	
+	pinMode(SYNC_PIN_1, syncPinState);
   
 	// Setting up output values
 	digitalWrite(OE_PIN, HIGH); 		// disable latch outputs
@@ -75,6 +77,8 @@ void setup()
 	digitalWrite(SW_ADDR_0, LOW);		// i2c switch addresss
 	digitalWrite(SW_ADDR_1, LOW);		// ...
 	digitalWrite(SW_ADDR_2, LOW);		// ...
+	
+	digitalWrite(SYNC_PIN_1, syncPinState);
   
   	if(debug) {
 		Serial.println("\nStarting up slave controller...");
@@ -140,6 +144,9 @@ void requestEvent()
 /* -------------------------------------------------------------------------- */
 void receiveEvent(int howmany)
 {
+	syncPinState = !syncPinState;
+	digitalWrite(SYNC_PIN_1, syncPinState);
+	
 	uint32_t piezoVal1 = 0xFFFFFFFF;
 	uint32_t piezoVal2 = 0xFFFFFFFF;
 	uint32_t piezoVal3 = 0xFFFFFFFF;
@@ -151,6 +158,7 @@ void receiveEvent(int howmany)
 	
 	// receive the first byte and check if it's an initialization request
 	uint8_t received = Wire.read();
+
 	if(received == SLAVE_INIT_COMMAND) {
 		bool reset = (Wire.read() == 1) ? true : false;
 		bool on = (Wire.read() == 1) ? true : false;
@@ -169,25 +177,40 @@ void receiveEvent(int howmany)
 		// receive all sent bytes and set (bitwise AND) the piezo bismasks
 		uint8_t decount = howmany;
 		while(decount > 0) {
-			if(debug) Serial.print("Received "); Serial.print(received, DEC);
+			if(debug) {
+				Serial.print("Received "); Serial.print(received, DEC);
+			}
 			if(received < 32) {
 				piezoVal1 &= piezoArray1[received];
-				if(debug) Serial.print("\t-> piezoVal1: 0x"); Serial.println(piezoVal1, HEX);
+				if(debug) {
+					Serial.print("\t-> piezoVal1: 0x"); Serial.println(piezoVal1, HEX);
+				}
 			} else if(received < 64) {
 				piezoVal2 &= piezoArray2[received-32];
-				if(debug) Serial.print("\t-> piezoVal2: 0x"); Serial.println(piezoVal2, HEX);
+				if(debug) {
+					Serial.print("\t-> piezoVal2: 0x"); Serial.println(piezoVal2, HEX);
+				}
 			} else if(received < 72) {
 				piezoVal3 &= piezoArray3[received-64];
-				if(debug) Serial.print("\t-> piezoVal3: 0x"); Serial.println(piezoVal3, HEX);
+				if(debug) {
+					Serial.print("\t-> piezoVal3: 0x"); Serial.println(piezoVal3, HEX);
+				}
 			} else {
-				if(debug) Serial.println("\t!!piezo value out of range!!");
+				if(debug) {
+					Serial.println("\t!!piezo value out of range!!");
+				}
 			}
+			
 			received = Wire.read();
 			decount--;
 		}
-		if(debug) Serial.println("");
+		if(debug) {
+			Serial.println("");
+		}
 		
 		// send the piezo bitmasks to the shift registers
 		piezoSend(piezoVal1, piezoVal2, piezoVal3);
 	}
+	syncPinState = !syncPinState;
+	digitalWrite(SYNC_PIN_1, syncPinState);
 }
