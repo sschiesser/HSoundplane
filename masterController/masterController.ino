@@ -44,6 +44,7 @@ void setup()
 	if(i2cFastMode) Wire.setClock(400000);
 	
 	// setting up sync pin(s)
+	syncPinState = false;
 	pinMode(SYNC_PIN_1, OUTPUT);
 	digitalWrite(SYNC_PIN_1, syncPinState);
 
@@ -60,7 +61,11 @@ void setup()
 	}
 
 	// Initializing slaves
+	// syncPinState = !syncPinState;
+	// digitalWrite(SYNC_PIN_1, syncPinState);
 	slaveInit();
+	// syncPinState = !syncPinState;
+	// digitalWrite(SYNC_PIN_1, syncPinState);
 }
 
 
@@ -81,7 +86,9 @@ void loop()
 		if(c == '\n') {
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
+			
 			strLength = parseCommand(command);
+			
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// measure parsing time
 			command = "";

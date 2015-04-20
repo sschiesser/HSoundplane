@@ -48,36 +48,36 @@ void setup()
 
 	SPI.begin(); // SPI...
 
-	// Setting up pin directions
-	pinMode(LED1_PIN, OUTPUT);			// LEDs
+	// Setting up pin directions & values
+	pinMode(LED1_PIN, OUTPUT);			// LEDs...
 	pinMode(LED2_PIN, OUTPUT);
 	pinMode(LED3_PIN, OUTPUT);
 	
-	pinMode(MOSI_PIN, OUTPUT);			// SPI
+	pinMode(MOSI_PIN, OUTPUT);			// SPI...
 	pinMode(MISO_PIN, INPUT_PULLUP);
 	pinMode(SCK_PIN, OUTPUT);
 	pinMode(SS_PIN, INPUT_PULLUP);
   
-	pinMode(OE_PIN, OUTPUT);			// shift registers controls
+	pinMode(OE_PIN, OUTPUT);			// shift registers...
 	pinMode(LOAD_PIN, OUTPUT);
 	pinMode(CLR_PIN, OUTPUT);
-  
-	pinMode(SW_ADDR_0, OUTPUT);			// i2c switch address
-	pinMode(SW_ADDR_1, OUTPUT);
-	pinMode(SW_ADDR_2, OUTPUT);  
-	
-	pinMode(SYNC_PIN_1, syncPinState);
-  
-	// Setting up output values
 	digitalWrite(OE_PIN, HIGH); 		// disable latch outputs
-	digitalWrite(CLR_PIN, HIGH);		// master restet active LOW
+	digitalWrite(CLR_PIN, LOW);			// reset registers
+	digitalWrite(CLR_PIN, HIGH);
 	digitalWrite(LOAD_PIN, LOW);		// storage clock active on rising edge
 	digitalWrite(OE_PIN, LOW);			// enable latch outputs
   
-	digitalWrite(SW_ADDR_0, LOW);		// i2c switch addresss
-	digitalWrite(SW_ADDR_1, LOW);		// ...
-	digitalWrite(SW_ADDR_2, LOW);		// ...
+	pinMode(SW_ADDR_0, OUTPUT);			// i2c switch address
+	digitalWrite(SW_ADDR_0, LOW);
+	pinMode(SW_ADDR_1, OUTPUT);
+	digitalWrite(SW_ADDR_1, LOW);
+	pinMode(SW_ADDR_2, OUTPUT);  
+	digitalWrite(SW_ADDR_2, LOW);
+	pinMode(A6, OUTPUT);				// fixing patch for wrong routing on board
+	pinMode(A7, OUTPUT);				// "Soundplane piezo-driver v0.95 - R002"
 	
+	syncPinState = false;				// sync pin...
+	pinMode(SYNC_PIN_1, OUTPUT);
 	digitalWrite(SYNC_PIN_1, syncPinState);
   
   	if(debug) {
@@ -129,11 +129,17 @@ void loop()
 /* -------------------------------------------------------------------------- */
 void requestEvent()
 {
+	// syncPinState = !syncPinState;
+	// digitalWrite(SYNC_PIN_1, syncPinState);
+	
 	if(debug) {
 		Serial.print("i2c registration request received... sending own address 0x");
 		Serial.println(I2C_SLAVE_ADDRESS, HEX);
 	}
 	Wire.write(I2C_SLAVE_ADDRESS);
+
+	// syncPinState = !syncPinState;
+	// digitalWrite(SYNC_PIN_1, syncPinState);
 }
 
 
@@ -172,7 +178,7 @@ void receiveEvent(int howmany)
 			Serial.print("gain - "); Serial.println(gain, DEC);
 			Serial.println("");
 		}
-		// driverSetup(reset, on, gain);
+		driverSetup(reset, on, gain);
 	} else {
 		// receive all sent bytes and set (bitwise AND) the piezo bismasks
 		uint8_t decount = howmany;

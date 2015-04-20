@@ -43,7 +43,7 @@
 #define SERIAL_SPEED		115200		// serial communication speed for debugging
 #define SPI_SPEED			2000000		// SPI communication speed for shift registers
 
-#define SYNC_PIN_1			2			// pin used to measure time between events
+#define SYNC_PIN_1			A0			// pin used to measure time between events
 
 
 /* -------------------------------------------------------------------------- */
@@ -51,7 +51,7 @@
 /* | VARIABLES																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool debug = false;				// DEBUG FLAG!!
+bool debug = true;				// DEBUG FLAG!!
 
 #if(I2C_FAST_MODE > 0)			// i2c speed flag
 	bool i2cFastMode = true;
@@ -61,7 +61,7 @@ bool debug = false;				// DEBUG FLAG!!
 
 SPISettings settingsA(SPI_SPEED, MSBFIRST, SPI_MODE0);	// SPI settings
 
-bool syncPinState = false;
+bool syncPinState;
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */

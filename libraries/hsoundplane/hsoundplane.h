@@ -59,6 +59,11 @@
 #define LED1_PIN			3			// LED1 -> device started up
 #define LED2_PIN			5			// LED2 -> drv2667 enabled
 #define LED3_PIN			6			// LED3 -> SPI activity
+#define XCK_PIN				4			// UART clock
+// #define TXD_PIN				TXD			// UART TX
+// #define RXD_PIN				RXD			// UARD RX
+#define SCL_PIN				A5			// i2c SCL (not needed since automatically assigned by setup)
+#define SDA_PIN				A4			// i2c SDA (not needed since automatically assigned by setup)
 #define SCK_PIN				13			// SPI clock (i.e. shift registers shifting clock)
 #define SS_PIN				10			// slave select (for SPI slave mode)
 #define MISO_PIN			12			// MISO (for SPI master receiver/slave transmitter mode)
@@ -67,8 +72,8 @@
 #define LOAD_PIN			8			// shift registers load clock (active rising)
 #define CLR_PIN				9			// shift registers clear (active low)
 #define SW_ADDR_0			2			// i2c switch hardware address bit0
-#define SW_ADDR_1			A6			// i2c switch hardware address bit1
-#define SW_ADDR_2			A7			// i2c switch hardware address bit2
+#define SW_ADDR_1			A2			// i2c switch hardware address bit1
+#define SW_ADDR_2			A3			// i2c switch hardware address bit2
 
 #define LED_ON				LOW			// macro to set if LEDs are switched on HIGH or LOW
 #define LED_OFF				HIGH		// and never forget it after that
