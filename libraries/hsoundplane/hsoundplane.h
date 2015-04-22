@@ -49,11 +49,12 @@
 
 // I2C communication settings
 #define I2C_SWITCH_ADDRESS	0x70		// i2c switch address (range: 0x70 - 0x77)
+#define I2C_MASTER_ADDRESS	0x40		// i2c master address
 #define I2C_SLAVE_ADDR1		0x51		// i2c slave1 address
 #define I2C_SLAVE_ADDR2		0x52		// i2c slave2 address
 #define I2C_SLAVE_ADDR3		0x53		// i2c slave3 address
 #define I2C_SLAVE_ADDR4		0x54 		// i2c slave4 address
-#define SLAVE_INIT_COMMAND	0xFF		// first i2c message byte to announce init sequence
+#define I2C_INIT_COMMAND	0xFF		// first i2c message byte to announce init sequence
 
 // Pinout of the arduino nano on the driver board
 #define LED1_PIN			3			// LED1 -> device started up

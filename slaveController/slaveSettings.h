@@ -45,13 +45,12 @@
 
 #define SYNC_PIN_1			A0			// pin used to measure time between events
 
-
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 /* | VARIABLES																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool debug = true;				// DEBUG FLAG!!
+bool debug = false;				// DEBUG FLAG!!
 
 #if(I2C_FAST_MODE > 0)			// i2c speed flag
 	bool i2cFastMode = true;
@@ -62,6 +61,13 @@ bool debug = true;				// DEBUG FLAG!!
 SPISettings settingsA(SPI_SPEED, MSBFIRST, SPI_MODE0);	// SPI settings
 
 bool syncPinState;
+bool slaveInitFlag;
+bool slaveWriteFlag;
+
+uint32_t piezoVal1;
+uint32_t piezoVal2;
+uint32_t piezoVal3;
+
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */

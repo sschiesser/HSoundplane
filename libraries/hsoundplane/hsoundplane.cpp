@@ -74,13 +74,13 @@ void slaveInit() {
 		if(i2cSlaveAvailable[i]) {
 			if(debug) {
 				Serial.print("Sending to 0x"); Serial.print(i2cSlaveAddresses[i], HEX);
-				Serial.print(": 0x"); Serial.print(SLAVE_INIT_COMMAND, HEX);
+				Serial.print(": 0x"); Serial.print(I2C_INIT_COMMAND, HEX);
 				Serial.print(" - "); Serial.print(reset);
 				Serial.print(" - "); Serial.print(on);
 				Serial.print(" - "); Serial.println(gain, DEC);
 			}
 			Wire.beginTransmission(i2cSlaveAddresses[i]);
-			Wire.write(SLAVE_INIT_COMMAND);
+			Wire.write(I2C_INIT_COMMAND);
 			Wire.write((uint8_t)reset);
 			Wire.write((uint8_t)on);
 			Wire.write(gain);
@@ -190,11 +190,11 @@ void driverSetup(bool startup, bool on, uint8_t gain) {
 		}
 
 		// open each i2c switch channel and send reset command to the attached drv2667
-		Wire.beginTransmission(I2C_SWITCH_ADDRESS);		
 		for(uint8_t i = 0; i < 8; i++) {
 			if(debug) {
 				Serial.print("- opening switch #"); Serial.println(i, DEC);
 			}
+			Wire.beginTransmission(I2C_SWITCH_ADDRESS);		
 			Wire.write((uint8_t)(1 << i));
 			Wire.endTransmission();
       
@@ -215,11 +215,11 @@ void driverSetup(bool startup, bool on, uint8_t gain) {
 		}
 
 		// open each i2c switch channel and send settings to the attached drv2667
-		Wire.beginTransmission(I2C_SWITCH_ADDRESS);
 		for(uint8_t i = 0; i < 8; i++) {
 			if(debug) {
 				Serial.print("- opening switch #"); Serial.println(i, DEC);
 			}
+			Wire.beginTransmission(I2C_SWITCH_ADDRESS);
 			Wire.write((uint8_t)(1 << i));
 			Wire.endTransmission();
       
@@ -262,11 +262,11 @@ void driverSetup(bool startup, bool on, uint8_t gain) {
 		}
 		
 		// open each i2c switch channel and send standby command to the attached drv2667
-		Wire.beginTransmission(I2C_SWITCH_ADDRESS);
 		for(uint8_t i = 0; i < 8; i++) {
 			if(debug) {
 				Serial.print("- opening switch #"); Serial.println(i, DEC);
 			}
+			Wire.beginTransmission(I2C_SWITCH_ADDRESS);
 			Wire.write((uint8_t)(1 << i));
 			Wire.endTransmission();
       
