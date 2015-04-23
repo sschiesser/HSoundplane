@@ -67,14 +67,16 @@ void setup()
 	digitalWrite(LOAD_PIN, LOW);		// storage clock active on rising edge
 	digitalWrite(OE_PIN, LOW);			// enable latch outputs
   
+	switchAddress = (I2C_SWITCH_ADDRESS - I2C_SWITCH_ADDR1);
 	pinMode(SW_ADDR_0, OUTPUT);			// i2c switch address
-	digitalWrite(SW_ADDR_0, LOW);
+	digitalWrite(SW_ADDR_0, (switchAddress & 0x01));
 	pinMode(SW_ADDR_1, OUTPUT);
-	digitalWrite(SW_ADDR_1, LOW);
+	digitalWrite(SW_ADDR_1, (switchAddress & 0x02));
 	pinMode(SW_ADDR_2, OUTPUT);  
-	digitalWrite(SW_ADDR_2, LOW);
+	digitalWrite(SW_ADDR_2, (switchAddress & 0x04));
 	pinMode(A6, OUTPUT);				// fixing patch for wrong routing on board
 	pinMode(A7, OUTPUT);				// "Soundplane piezo-driver v0.95 - R002"
+	
 	
 	syncPinState = false;				// sync pin...
 	pinMode(SYNC_PIN_1, OUTPUT);
@@ -138,15 +140,30 @@ void loop()
 			Serial.print("gain - "); Serial.println(gain, DEC);
 			Serial.println("");
 		}
+		for(uint8_t i = (switchAddress+1); i > 0; i--) {
+			delay(INIT_WAIT_MS);
+		}
+		syncPinState = !syncPinState;
+		digitalWrite(SYNC_PIN_1, syncPinState);
+
 		driverSetup(reset, on, gain);
 		slaveInitFlag = false;
+
+		syncPinState = !syncPinState;
+		digitalWrite(SYNC_PIN_1, syncPinState);
 	} else if(slaveWriteFlag) {
 		if(debug) {
 			Serial.println("writing to drivers...");
 		}
+		syncPinState = !syncPinState;
+		digitalWrite(SYNC_PIN_1, syncPinState);
+
 		// send the piezo bitmasks to the shift registers
 		piezoSend(piezoVal1, piezoVal2, piezoVal3);
 		slaveWriteFlag = false;
+
+		syncPinState = !syncPinState;
+		digitalWrite(SYNC_PIN_1, syncPinState);
 	}
 }
 
@@ -179,9 +196,6 @@ void requestEvent()
 /* -------------------------------------------------------------------------- */
 void receiveEvent(int howmany)
 {
-	syncPinState = !syncPinState;
-	digitalWrite(SYNC_PIN_1, syncPinState);
-	
 	if(debug) {
 		Serial.print("i2c message received... length: ");
 		Serial.println(howmany, DEC);
@@ -191,20 +205,13 @@ void receiveEvent(int howmany)
 	uint8_t received = Wire.read();
 	
 	if(received == I2C_INIT_COMMAND) {
+		syncPinState = !syncPinState;
+		digitalWrite(SYNC_PIN_1, syncPinState);
+
 		slaveInitFlag = true;
-		// bool reset = (Wire.read() == 1) ? true : false;
-		// bool on = (Wire.read() == 1) ? true : false;
-		// uint8_t gain = Wire.read();
-		// if(debug) {
-		// 	Serial.print("INIT: ");
-		// 	Serial.print("reset - "); Serial.print((reset) ? "true" : "false");
-		// 	Serial.print(" / ");
-		// 	Serial.print("switch on - "); Serial.print((on) ? "true" : "false");
-		// 	Serial.print(" / ");
-		// 	Serial.print("gain - "); Serial.println(gain, DEC);
-		// 	Serial.println("");
-		// }
-		// driverSetup(reset, on, gain);
+
+		syncPinState = !syncPinState;
+		digitalWrite(SYNC_PIN_1, syncPinState);
 	} else {
 		// receive all sent bytes and set (bitwise AND) the piezo bismasks
 		uint8_t decount = howmany;
@@ -212,6 +219,9 @@ void receiveEvent(int howmany)
 		piezoVal2 = 0xFFFFFFFF;
 		piezoVal3 = 0xFFFFFFFF;
 		
+		syncPinState = !syncPinState;
+		digitalWrite(SYNC_PIN_1, syncPinState);
+
 		while(decount > 0) {
 			if(debug) {
 				Serial.print("Received "); Serial.print(received, DEC);
@@ -245,7 +255,8 @@ void receiveEvent(int howmany)
 		}
 
 		slaveWriteFlag = true;
+
+		syncPinState = !syncPinState;
+		digitalWrite(SYNC_PIN_1, syncPinState);
 	}
-	syncPinState = !syncPinState;
-	digitalWrite(SYNC_PIN_1, syncPinState);
 }

@@ -41,7 +41,7 @@
 #define START_MARKER_MASK	0xE0		// bit mask to recognize serial start byte (ST)
 #define STOP_MARKER_MASK	0xF0		// bit mask to recognize serial stop byte (SP)
 
-#define STARTUP_WAIT_MS		2000		// startup waiting time to let the slaves be ready
+#define STARTUP_WAIT_MS		50		// startup waiting time to let the slaves be ready
 
 #define SYNC_PIN_1			2			// pin used to measure time between events
 

@@ -28,6 +28,7 @@
 #ifndef _SLAVESETTINGS_H
 #define _SLAVESETTINGS_H
 
+#include "HSoundplane.h"
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -35,13 +36,15 @@
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 // TO CHANGE FOR EACH SLAVE
-#define I2C_SLAVE_ADDRESS	0x51		// own i2c slave address to respond to
+// #define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR1		// own i2c slave address to respond to
 
 // GENERAL SLAVE SETTINGS
 #define I2C_FAST_MODE		1			// 0 -> standad mode (100 kHz) i2c,
 										// 1 -> fast mode (400 kHz)
 #define SERIAL_SPEED		115200		// serial communication speed for debugging
 #define SPI_SPEED			2000000		// SPI communication speed for shift registers
+
+#define INIT_WAIT_MS		100
 
 #define SYNC_PIN_1			A0			// pin used to measure time between events
 
@@ -63,6 +66,7 @@ SPISettings settingsA(SPI_SPEED, MSBFIRST, SPI_MODE0);	// SPI settings
 bool syncPinState;
 bool slaveInitFlag;
 bool slaveWriteFlag;
+uint8_t switchAddress;
 
 uint32_t piezoVal1;
 uint32_t piezoVal2;

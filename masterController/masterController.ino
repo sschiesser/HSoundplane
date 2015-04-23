@@ -38,16 +38,23 @@
 /* -------------------------------------------------------------------------- */
 void setup()
 {
+	// setting up sync pin(s)
+	syncPinState = false;
+	pinMode(SYNC_PIN_1, OUTPUT);
+	digitalWrite(SYNC_PIN_1, syncPinState);
+	
+	syncPinState = !syncPinState;
+	digitalWrite(SYNC_PIN_1, syncPinState);
+	syncPinState = !syncPinState;
+	digitalWrite(SYNC_PIN_1, syncPinState);
+	
+	delay(STARTUP_WAIT_MS);
+	
 	// Setting up communication...
 	Serial.begin(SERIAL_SPEED);
 	Wire.begin(); // Start i2c
 	if(i2cFastMode) Wire.setClock(400000);
 	
-	// setting up sync pin(s)
-	syncPinState = false;
-	pinMode(SYNC_PIN_1, OUTPUT);
-	digitalWrite(SYNC_PIN_1, syncPinState);
-
 	if(debug) {
 		Serial.println("\nStarting up master controller...");
 		Serial.println("*************************************");
@@ -61,11 +68,7 @@ void setup()
 	}
 
 	// Initializing slaves
-	// syncPinState = !syncPinState;
-	// digitalWrite(SYNC_PIN_1, syncPinState);
 	slaveInit();
-	// syncPinState = !syncPinState;
-	// digitalWrite(SYNC_PIN_1, syncPinState);
 }
 
 
