@@ -30,6 +30,7 @@
 
 #include "drv2667.h"
 
+#define SLAVE_ID			4
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 /* | MACROS																	| */
@@ -58,10 +59,25 @@
 #define I2C_SWITCH_ADDR2	0x71		// i2c switch2 address
 #define I2C_SWITCH_ADDR3	0x72		// i2c switch3 address
 #define I2C_SWITCH_ADDR4	0x73		// i2c switch4 address
+#define I2C_REGISTER_SET	0xFD
+#define I2C_INIT_NOTIFY		0xFE	
 #define I2C_INIT_COMMAND	0xFF		// first i2c message byte to announce init sequence
-
+#if(SLAVE_ID == 1)
+#define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR1
+#define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR1
+#elif(SLAVE_ID == 2)
+#define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR2
+#define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR2
+#elif(SLAVE_ID == 3)
 #define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR3
 #define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR3
+#elif(SLAVE_ID == 4)
+#define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR4
+#define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR4
+#else
+#define I2C_SLAVE_ADDRESS	0xFF
+#define I2C_SWITCH_ADDRESS	0xFF
+#endif
 
 // Pinout of the arduino nano on the driver board
 #define LED1_PIN			3			// LED1 -> device started up
@@ -87,7 +103,7 @@
 #define LED_OFF				HIGH		// and never forget it after that
 
 
-#define DEBUG_MONITOR_DELAY_MS	50		// waiting time for debug Serial.print
+#define DEBUG_MONITOR_DELAY_MS	20		// waiting time for debug Serial.print
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -129,7 +145,8 @@ extern bool i2cSlaveAvailable[NUMBER_OF_SLAVES];
 // master functions
 // void slaveInit(bool, bool, uint8_t);
 void slaveRegister();
-uint8_t slaveDrvSetup(int8_t, bool, bool, uint8_t);
+bool slaveDrvSetup(int8_t, bool, bool, uint8_t);
+void slaveInitNotify(int8_t, bool);
 void distributeCoordinates(uint8_t len, uint8_t orig[MAX_COORD_PAIRS][2], uint8_t dest[NUMBER_OF_SLAVES][MAX_COORD_PAIRS]);
 void sendToSlave(uint8_t slaveNumber, uint8_t *message, uint8_t len);
 

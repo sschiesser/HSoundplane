@@ -83,6 +83,7 @@ void setup()
 	digitalWrite(SYNC_PIN_1, syncPinState);
 	
 	slaveInitFlag = false;				// slave initialization flag...
+	slaveNotifyFlag = false;			// slave notification flag...
 	slaveWriteFlag = false;				// slave writing command flag...
   
   	if(debug) {
@@ -125,36 +126,45 @@ void loop()
 {
 	// delay(1);
 	if(slaveInitFlag) {
-		if(debug) {
-			Serial.println("initializing drivers...");
-		}
-		bool reset = (Wire.read() == 1) ? true : false;
-		bool on = (Wire.read() == 1) ? true : false;
-		uint8_t gain = Wire.read();
-		if(debug) {
-			Serial.print("INIT: ");
-			Serial.print("reset - "); Serial.print((reset) ? "true" : "false");
-			Serial.print(" / ");
-			Serial.print("switch on - "); Serial.print((on) ? "true" : "false");
-			Serial.print(" / ");
-			Serial.print("gain - "); Serial.println(gain, DEC);
-			Serial.println("");
-		}
-		for(uint8_t i = (switchAddress+1); i > 0; i--) {
-			delay(INIT_WAIT_MS);
-		}
+	// 	if(debug) {
+	// 		Serial.println("initializing drivers...");
+	// 	}
+	// 	bool reset = (Wire.read() == 1) ? true : false;
+	// 	bool on = (Wire.read() == 1) ? true : false;
+	// 	uint8_t gain = Wire.read();
+	// 	if(debug) {
+	// 		Serial.print("INIT: ");
+	// 		Serial.print("reset - "); Serial.print((reset) ? "true" : "false");
+	// 		Serial.print(" / ");
+	// 		Serial.print("switch on - "); Serial.print((on) ? "true" : "false");
+	// 		Serial.print(" / ");
+	// 		Serial.print("gain - "); Serial.println(gain, DEC);
+	// 		Serial.println("");
+	// 	}
+	// 	// for(uint8_t i = (switchAddress+1); i > 0; i--) {
+	// 	// 	delay(INIT_WAIT_MS);
+	// 	// }
+	// 	syncPinState = !syncPinState;
+	// 	digitalWrite(SYNC_PIN_1, syncPinState);
+	//
+	// 	// driverSetup(reset, on, gain);
+	// 	// slaveInitFlag = false;
+	//
+	// 	syncPinState = !syncPinState;
+	// 	digitalWrite(SYNC_PIN_1, syncPinState);
+	}
+	
+	if(slaveNotifyFlag) {
 		syncPinState = !syncPinState;
 		digitalWrite(SYNC_PIN_1, syncPinState);
 
-		driverSetup(reset, on, gain);
-		slaveInitFlag = false;
+		slaveNotifyFlag = false;
 
 		syncPinState = !syncPinState;
 		digitalWrite(SYNC_PIN_1, syncPinState);
-	} else if(slaveWriteFlag) {
-		if(debug) {
-			Serial.println("writing to drivers...");
-		}
+	} 
+	
+	if(slaveWriteFlag) {
 		syncPinState = !syncPinState;
 		digitalWrite(SYNC_PIN_1, syncPinState);
 
@@ -181,6 +191,7 @@ void requestEvent()
 	if(debug) {
 		Serial.print("i2c registration request received... sending own address 0x");
 		Serial.println(I2C_SLAVE_ADDRESS, HEX);
+		delay(DEBUG_MONITOR_DELAY_MS);
 	}
 	Wire.write(I2C_SLAVE_ADDRESS);
 
@@ -196,67 +207,98 @@ void requestEvent()
 /* -------------------------------------------------------------------------- */
 void receiveEvent(int howmany)
 {
-	if(debug) {
-		Serial.print("i2c message received... length: ");
-		Serial.println(howmany, DEC);
-	}
-	
+	uint8_t decount = howmany;
+
 	// receive the first byte and check if it's an initialization request
 	uint8_t received = Wire.read();
+	decount--;
+	if(debug) {
+		Serial.print("\nI2C message received... length: "); Serial.print(howmany, DEC);
+		Serial.print(" first byte: 0x"); Serial.println(received, HEX);
+		delay(DEBUG_MONITOR_DELAY_MS);
+	}
 	
-	if(received == I2C_INIT_COMMAND) {
-		syncPinState = !syncPinState;
-		digitalWrite(SYNC_PIN_1, syncPinState);
-
-		slaveInitFlag = true;
-
-		syncPinState = !syncPinState;
-		digitalWrite(SYNC_PIN_1, syncPinState);
-	} else {
-		// receive all sent bytes and set (bitwise AND) the piezo bismasks
-		uint8_t decount = howmany;
-		piezoVal1 = 0xFFFFFFFF;
-		piezoVal2 = 0xFFFFFFFF;
-		piezoVal3 = 0xFFFFFFFF;
+	switch(received) {
+		case I2C_REGISTER_SET:
+		if(debug) {
+			Serial.println("Setting shift registers...");
+		}
+			// receive all sent bytes and set (bitwise AND) the piezo bismasks
+			piezoVal1 = 0xFFFFFFFF;
+			piezoVal2 = 0xFFFFFFFF;
+			piezoVal3 = 0xFFFFFFFF;
 		
-		syncPinState = !syncPinState;
-		digitalWrite(SYNC_PIN_1, syncPinState);
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);
 
-		while(decount > 0) {
+			while(decount > 0) {
+				received = Wire.read();
+				decount--;
+				if(debug) {
+					Serial.print("Received "); Serial.print(received, DEC);
+					delay(DEBUG_MONITOR_DELAY_MS);
+				}
+				if(received < 32) {
+					piezoVal1 &= piezoArray1[received];
+					if(debug) {
+						Serial.print("\t-> piezoVal1: 0x"); Serial.println(piezoVal1, HEX);
+					}
+				} else if(received < 64) {
+					piezoVal2 &= piezoArray2[received-32];
+					if(debug) {
+						Serial.print("\t-> piezoVal2: 0x"); Serial.println(piezoVal2, HEX);
+					}
+				} else if(received < 72) {
+					piezoVal3 &= piezoArray3[received-64];
+					if(debug) {
+						Serial.print("\t-> piezoVal3: 0x"); Serial.println(piezoVal3, HEX);
+					}
+				} else {
+					if(debug) {
+						Serial.println("\t!!piezo value out of range!!");
+					}
+				}
+			}
 			if(debug) {
-				Serial.print("Received "); Serial.print(received, DEC);
-			}
-			if(received < 32) {
-				piezoVal1 &= piezoArray1[received];
-				if(debug) {
-					Serial.print("\t-> piezoVal1: 0x"); Serial.println(piezoVal1, HEX);
-				}
-			} else if(received < 64) {
-				piezoVal2 &= piezoArray2[received-32];
-				if(debug) {
-					Serial.print("\t-> piezoVal2: 0x"); Serial.println(piezoVal2, HEX);
-				}
-			} else if(received < 72) {
-				piezoVal3 &= piezoArray3[received-64];
-				if(debug) {
-					Serial.print("\t-> piezoVal3: 0x"); Serial.println(piezoVal3, HEX);
-				}
-			} else {
-				if(debug) {
-					Serial.println("\t!!piezo value out of range!!");
-				}
+				Serial.println("");
 			}
 
+			slaveWriteFlag = true;
+
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);
+			break;
+		
+		case I2C_INIT_NOTIFY:
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);
+			
 			received = Wire.read();
 			decount--;
-		}
-		if(debug) {
-			Serial.println("");
-		}
-
-		slaveWriteFlag = true;
-
-		syncPinState = !syncPinState;
-		digitalWrite(SYNC_PIN_1, syncPinState);
+			if(received == 1) {
+				if(debug) {
+					Serial.println("OK notification");
+				}
+				digitalWrite(LED2_PIN, LED_ON);
+			} else {
+				if(debug) {
+					Serial.println("NOT OK notification");
+				}
+				digitalWrite(LED2_PIN, LED_OFF);
+			}
+			while(decount > 0) {
+				received = Wire.read();
+				decount--;
+			}
+			
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);
+			break;
+		
+		case I2C_INIT_COMMAND:
+			break;
+		
+		default:
+			break;
 	}
 }

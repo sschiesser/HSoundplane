@@ -65,6 +65,7 @@ SPISettings settingsA(SPI_SPEED, MSBFIRST, SPI_MODE0);	// SPI settings
 
 bool syncPinState;
 bool slaveInitFlag;
+bool slaveNotifyFlag;
 bool slaveWriteFlag;
 uint8_t switchAddress;
 

@@ -70,6 +70,9 @@ void setup()
 	// Initializing slaves
 	slaveRegister();
 	for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
+		syncPinState = !syncPinState;
+		digitalWrite(SYNC_PIN_1, syncPinState);
+		
 		bool reset = true;
 		bool on = true;
 		uint8_t gain = 3;
@@ -78,7 +81,10 @@ void setup()
 				Serial.print("\nSetting up slave @ 0x"); Serial.print(i2cSlaveAddresses[i], HEX);
 				Serial.println(":\n------------------------");
 			}
-			slaveDrvSetup(i2cSwitchAddresses[i], reset, on, gain);
+			bool setupOk = slaveDrvSetup(i2cSwitchAddresses[i], reset, on, gain);
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);
+			slaveInitNotify(i2cSlaveAddresses[i], setupOk);
 		}
 	}
 }
@@ -111,13 +117,15 @@ void loop()
 				distributeCoordinates(strLength, HScoord, piezoMatrix);
 				for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
 					if(i2cSlaveAvailable[i]) {
-						sendToSlave(i2cSlaveAddresses[i], piezoMatrix[i], piCnt[i]);
+						if(piCnt[i] > 0) {
+							sendToSlave(i2cSlaveAddresses[i], piezoMatrix[i], piCnt[i]);
+						}
 					}
 					piCnt[i] = 0;
-					if(debug) {
-						Serial.print("piCnt["); Serial.print(i, DEC);
-						Serial.print("]: "); Serial.println(piCnt[i], DEC);
-					}
+					// if(debug) {
+					// 	Serial.print("piCnt["); Serial.print(i, DEC);
+					// 	Serial.print("]: "); Serial.println(piCnt[i], DEC);
+					// }
 				}
 			}
 		}
@@ -137,7 +145,8 @@ void loop()
 uint8_t parseCommand(String com)
 {
 	if(debug) {
-		Serial.println("Entering parser...");
+		Serial.println("\nEntering parser...");
+		Serial.println("------------------");
 	}
 
 	String subPart;		// substring used for trimming
@@ -147,7 +156,7 @@ uint8_t parseCommand(String com)
   
 	if(debug) {
 		Serial.print("Received: "); Serial.print(com);
-		Serial.print(" ...length: "); Serial.println(com.length());
+		// Serial.print(" ...length: "); Serial.println(com.length());
 	}
 	if(com.length() != 0) {
 		cont = true;
@@ -182,27 +191,27 @@ uint8_t parseCommand(String com)
       
 			if(byteOne & firstPair) {
 				if(debug) {
-					Serial.print("B1 (col) & ST --> "); Serial.println(coord, DEC);
+					Serial.print("B1 (col) & ST\t--> "); Serial.println(coord, DEC);
 				}
 				index = 0;
 				HScoord[index][0] = (coord & ~START_MARKER_MASK);
 				byteOne = false;
 			} else if(byteOne & !firstPair) {
 				if(debug) {
-					Serial.print("B1 (col) --> "); Serial.println(coord, DEC);
+					Serial.print("B1 (col)\t--> "); Serial.println(coord, DEC);
 				}
 				HScoord[index][0] = coord;
 				byteOne = false;
 			} else if(!byteOne & !lastPair) {
 				if(debug) {
-					Serial.print("B2 (raw) --> "); Serial.println(coord, DEC);
+					Serial.print("B2 (raw)\t--> "); Serial.println(coord, DEC);
 				}
 				HScoord[index][1] = coord;
 				index += 1;
 				byteOne = true;
 			} else if(!byteOne & lastPair) {
 				if(debug) {
-					Serial.print("B2 (raw) & SP --> "); Serial.println(coord, DEC);
+					Serial.print("B2 (raw) & SP\t--> "); Serial.println(coord, DEC);
 				}
 				HScoord[index][1] = (coord & ~STOP_MARKER_MASK);
 				byteOne = true;
@@ -219,10 +228,11 @@ uint8_t parseCommand(String com)
 		}
     
 		if(debug) {
-			Serial.print("Coordinates table (#pairs: "); Serial.print(piezoPairs); Serial.println("):");
+			Serial.print("\nCoordinates table ("); Serial.print(piezoPairs); Serial.println(" pairs):");
+			Serial.println("x\ty\n---------");
 			for(i = 0; i < piezoPairs; i++) {
-				Serial.print("x "); Serial.print(HScoord[i][0], DEC);
-				Serial.print("   y "); Serial.println(HScoord[i][1], DEC);
+				Serial.print(HScoord[i][0], DEC);
+				Serial.print("\t"); Serial.println(HScoord[i][1], DEC);
 			}
 		}
 	}
