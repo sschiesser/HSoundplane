@@ -46,6 +46,7 @@
 #endif
 #define MAX_PIEZO_VAL		(NUMBER_OF_SLAVES * PIEZOS_PER_SLAVE)	// number of available piezos
 #define MAX_COORD_PAIRS		16			// maximal amount of simultaneous coordinate pairs
+#define DRV_PER_SLAVE		8			// number of drv2667 per slave
 
 // I2C communication settings
 #define I2C_MASTER_ADDRESS	0x40		// i2c master address
@@ -57,7 +58,6 @@
 #define I2C_SWITCH_ADDR2	0x71		// i2c switch2 address
 #define I2C_SWITCH_ADDR3	0x72		// i2c switch3 address
 #define I2C_SWITCH_ADDR4	0x73		// i2c switch4 address
-#define I2C_SWITCH_ADDR5	0x74		// i2c switch5 address
 #define I2C_INIT_COMMAND	0xFF		// first i2c message byte to announce init sequence
 
 #define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR3
@@ -87,6 +87,8 @@
 #define LED_OFF				HIGH		// and never forget it after that
 
 
+#define DEBUG_MONITOR_DELAY_MS	50		// waiting time for debug Serial.print
+
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 /* | VARIABLES																| */
@@ -114,7 +116,8 @@ extern SPISettings settingsA;
 extern uint8_t HScoord[MAX_COORD_PAIRS][2];
 extern uint8_t piezoMatrix[NUMBER_OF_SLAVES][MAX_COORD_PAIRS];
 extern uint8_t piCnt[NUMBER_OF_SLAVES];
-extern int8_t i2cSlaveAddresses[4];
+extern int8_t i2cSlaveAddresses[NUMBER_OF_SLAVES];
+extern int8_t i2cSwitchAddresses[NUMBER_OF_SLAVES];
 extern bool i2cSlaveAvailable[NUMBER_OF_SLAVES];
 
 
@@ -124,12 +127,14 @@ extern bool i2cSlaveAvailable[NUMBER_OF_SLAVES];
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 // master functions
-void slaveInit();
+// void slaveInit(bool, bool, uint8_t);
+void slaveRegister();
+uint8_t slaveDrvSetup(int8_t, bool, bool, uint8_t);
 void distributeCoordinates(uint8_t len, uint8_t orig[MAX_COORD_PAIRS][2], uint8_t dest[NUMBER_OF_SLAVES][MAX_COORD_PAIRS]);
 void sendToSlave(uint8_t slaveNumber, uint8_t *message, uint8_t len);
 
 // slave functions
-void driverSetup(bool startup, bool on, uint8_t gain);
+void driverSetup(bool, bool on, uint8_t gain);
 void piezoSend(uint32_t val1, uint32_t val2, uint32_t val3);
 
 

@@ -51,7 +51,7 @@
 /* | VARIABLES																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool debug = false;						// DEBUG FLAG!!
+bool debug = true;						// DEBUG FLAG!!
 
 #if(I2C_FAST_MODE > 0)					// i2c speed flag
   bool i2cFastMode = true;
@@ -76,6 +76,13 @@ int8_t i2cSlaveAddresses[] = {			// slave addresses array
 	I2C_SLAVE_ADDR2,
 	I2C_SLAVE_ADDR3,
 	I2C_SLAVE_ADDR4
+};
+
+int8_t i2cSwitchAddresses[] = {			// i2c switch addresses array
+	I2C_SWITCH_ADDR1,
+	I2C_SWITCH_ADDR2,
+	I2C_SWITCH_ADDR3,
+	I2C_SWITCH_ADDR4
 };
 
 bool i2cSlaveAvailable[NUMBER_OF_SLAVES];	// available slaves array

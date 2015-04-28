@@ -68,7 +68,19 @@ void setup()
 	}
 
 	// Initializing slaves
-	slaveInit();
+	slaveRegister();
+	for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
+		bool reset = true;
+		bool on = true;
+		uint8_t gain = 3;
+		if(i2cSlaveAvailable[i]) {
+			if(debug) {
+				Serial.print("\nSetting up slave @ 0x"); Serial.print(i2cSlaveAddresses[i], HEX);
+				Serial.println(":\n------------------------");
+			}
+			slaveDrvSetup(i2cSwitchAddresses[i], reset, on, gain);
+		}
+	}
 }
 
 
