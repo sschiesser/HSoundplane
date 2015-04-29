@@ -102,14 +102,31 @@ void loop()
 	// Waiting for characters on the serial port until '\n' (LF).
 	// Then process the received command line
 	if(Serial.available()) {
-		char c = Serial.read();
+		char c = (char)Serial.read();
     
+#if(MAX_INTERFACE > 0)
+		if(c == ']') {
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
+			strLength = command.length();
+			command = command.substring(2, (strLength-2));
+			command.trim();
+			if(debug) {
+				Serial.print("Max command: "); Serial.println(command);
+				Serial.print("Length: "); Serial.println(strLength);
+			}
+#else
 		if(c == '\n') {
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
-			
+			strLength = command.length();
+			command = command.substring(0, (strLength-1));
+			if(debug) {
+				Serial.print("Monitor command: "); Serial.println(command);
+				Serial.print("Length: "); Serial.println(strLength);
+			}
+#endif
 			strLength = parseCommand(command);
-			
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// measure parsing time
 			command = "";
@@ -122,10 +139,6 @@ void loop()
 						}
 					}
 					piCnt[i] = 0;
-					// if(debug) {
-					// 	Serial.print("piCnt["); Serial.print(i, DEC);
-					// 	Serial.print("]: "); Serial.println(piCnt[i], DEC);
-					// }
 				}
 			}
 		}
@@ -156,7 +169,7 @@ uint8_t parseCommand(String com)
   
 	if(debug) {
 		Serial.print("Received: "); Serial.print(com);
-		// Serial.print(" ...length: "); Serial.println(com.length());
+		Serial.print(" ...length: "); Serial.println(com.length());
 	}
 	if(com.length() != 0) {
 		cont = true;
@@ -174,6 +187,9 @@ uint8_t parseCommand(String com)
 			* - if B2 (raw) & NOT stop marker   -> any B2 (raw)
 			*/
 			coord = subPart.toInt();
+			if(debug) {
+				Serial.print("Coord: "); Serial.println(coord, DEC);
+			}
 			if(byteOne) {
 				if(coord & START_MARKER_MASK) {
 					firstPair = true;
