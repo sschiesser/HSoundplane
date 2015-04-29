@@ -63,15 +63,13 @@ void setup()
 		Serial.print("slaves:\n\t- quantity: "); Serial.println(NUMBER_OF_SLAVES, DEC);
 		Serial.print("\t- piezos/slave: "); Serial.println(PIEZOS_PER_SLAVE, DEC);
 		Serial.print("\t -> available piezos: "); Serial.println(MAX_PIEZO_VAL, DEC);
-		// Serial.print("drivers:\n\t- gain: "); Serial.println(drv2667Gain, DEC);
 		Serial.println("**************************************\n");
 	}
 
 	// Initializing slaves
 	slaveRegister();
 	for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
-		syncPinState = !syncPinState;
-		digitalWrite(SYNC_PIN_1, syncPinState);
+		delay(INIT_WAIT_MS);
 		
 		bool reset = true;
 		bool on = true;
@@ -99,159 +97,221 @@ void loop()
 {
 	uint8_t strLength;
   
-	// Waiting for characters on the serial port until '\n' (LF).
+	// Collecting characters on the serial port started by '[' and terminated by ']'.
 	// Then process the received command line
 	if(Serial.available()) {
 		char c = (char)Serial.read();
     
-#if(MAX_INTERFACE > 0)
-		if(c == ']') {
-			syncPinState = !syncPinState;
-			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
-			strLength = command.length();
-			command = command.substring(2, (strLength-2));
-			command.trim();
-			if(debug) {
-				Serial.print("Max command: "); Serial.println(command);
-				Serial.print("Length: "); Serial.println(strLength);
-			}
-#else
-		if(c == '\n') {
-			syncPinState = !syncPinState;
-			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
-			strLength = command.length();
-			command = command.substring(0, (strLength-1));
-			if(debug) {
-				Serial.print("Monitor command: "); Serial.println(command);
-				Serial.print("Length: "); Serial.println(strLength);
-			}
-#endif
-			strLength = parseCommand(command);
-			syncPinState = !syncPinState;
-			digitalWrite(SYNC_PIN_1, syncPinState);		// measure parsing time
+		if(c == '[') {
 			command = "";
-			if(strLength != -1) {
-				distributeCoordinates(strLength, HScoord, piezoMatrix);
-				for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
-					if(i2cSlaveAvailable[i]) {
-						if(piCnt[i] > 0) {
-							sendToSlave(i2cSlaveAddresses[i], piezoMatrix[i], piCnt[i]);
-						}
-					}
-					piCnt[i] = 0;
+		} else if(c == ']') {
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
+
+			strLength = command.length();
+			if(debug) {
+				Serial.print("Command: "); Serial.println(command);
+				Serial.print("Length: "); Serial.println(strLength);
+			}
+			strLength = sliceCommand(command);
+
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);		// measuring slicing time
+
+			uint8_t HSpairs = strLength / 2;
+			for(uint8_t i = 0; i < HSpairs; i++) {
+				HScoord[i][0] = convertStrToInt(slicedCmd[2*i]);
+				HScoord[i][1] = convertStrToInt(slicedCmd[(2*i)+1]);
+				if(debug) {
+					Serial.print("HScoord: "); Serial.print(HScoord[i][0]);
+					Serial.print(" "); Serial.println(HScoord[i][1]);
 				}
 			}
-		}
-		else {
+			
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);		// measure converting time
+
+			distributeCoordinates(HSpairs, HScoord, piezoMatrix);
+
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);		// measure distributing time
+
+			for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
+				if(i2cSlaveAvailable[i]) {
+					if(piCnt[i] > 0) {
+						sendToSlave(i2cSlaveAddresses[i], piezoMatrix[i], piCnt[i]);
+					}
+				}
+				piCnt[i] = 0;
+			}
+
+			syncPinState = !syncPinState;
+			digitalWrite(SYNC_PIN_1, syncPinState);		// measure sending time
+
+		} else {
 			command += c;
 		}
 	}
 }
 
 
-
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/* | parseCommand															| */
+/* | sliceCommand															| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-uint8_t parseCommand(String com)
+uint8_t sliceCommand(String s)
 {
 	if(debug) {
-		Serial.println("\nEntering parser...");
-		Serial.println("------------------");
+		Serial.println("\nSlicing command line into ints...");
+		Serial.println("---------------------------------");
 	}
-
-	String subPart;		// substring used for trimming
-	uint8_t i, piezoPairs, coord, index;
-	bool cont;			// Flag to continue slicing the command string
-	bool startMarkerSet, byteOne, firstPair, lastPair;
-  
-	if(debug) {
-		Serial.print("Received: "); Serial.print(com);
-		Serial.print(" ...length: "); Serial.println(com.length());
-	}
-	if(com.length() != 0) {
-		cont = true;
-		byteOne = true;
-		com.concat(" "); // Work around to be able to terminate the parsing of the string
-		i = 0;
-		while(cont) {
-			subPart = com.substring(0, com.indexOf(" "));
-			subPart.trim();
-            
-			/* Byte marker logic:
-			* - if B1 (col) & start marker      -> first byte
-			* - if B1 (col) & NOT start marker  -> any B1 (col)
-			* - if B2 (raw) & stop marker       -> last byte
-			* - if B2 (raw) & NOT stop marker   -> any B2 (raw)
-			*/
-			coord = subPart.toInt();
-			if(debug) {
-				Serial.print("Coord: "); Serial.println(coord, DEC);
-			}
-			if(byteOne) {
-				if(coord & START_MARKER_MASK) {
-					firstPair = true;
-					lastPair = false;
-				} else {
-					firstPair = false;
-				}
-			} else {
-				if(coord & STOP_MARKER_MASK) {
-					lastPair = true;
-				} else {
-					lastPair = false;
-				}
-			}
-      
-			if(byteOne & firstPair) {
-				if(debug) {
-					Serial.print("B1 (col) & ST\t--> "); Serial.println(coord, DEC);
-				}
-				index = 0;
-				HScoord[index][0] = (coord & ~START_MARKER_MASK);
-				byteOne = false;
-			} else if(byteOne & !firstPair) {
-				if(debug) {
-					Serial.print("B1 (col)\t--> "); Serial.println(coord, DEC);
-				}
-				HScoord[index][0] = coord;
-				byteOne = false;
-			} else if(!byteOne & !lastPair) {
-				if(debug) {
-					Serial.print("B2 (raw)\t--> "); Serial.println(coord, DEC);
-				}
-				HScoord[index][1] = coord;
-				index += 1;
-				byteOne = true;
-			} else if(!byteOne & lastPair) {
-				if(debug) {
-					Serial.print("B2 (raw) & SP\t--> "); Serial.println(coord, DEC);
-				}
-				HScoord[index][1] = (coord & ~STOP_MARKER_MASK);
-				byteOne = true;
-				piezoPairs = index + 1;
-			} else {
-				if(debug) {
-					Serial.println("ERROR in pair matching!");
-				}
-				return -1;
-			}
-      
-			com.remove(0, com.indexOf(" ") + 1);
-			if(com.length() <= 0) cont = false;
-		}
-    
+	
+	String temp = "";
+	uint8_t sliceInc = 0;
+	
+	for(uint8_t i = 0; i < s.length(); i++) {
 		if(debug) {
-			Serial.print("\nCoordinates table ("); Serial.print(piezoPairs); Serial.println(" pairs):");
-			Serial.println("x\ty\n---------");
-			for(i = 0; i < piezoPairs; i++) {
-				Serial.print(HScoord[i][0], DEC);
-				Serial.print("\t"); Serial.println(HScoord[i][1], DEC);
+			Serial.print("char: "); Serial.println(s[i], DEC);
+		}
+		if(s[i] == ' ') {
+			slicedCmd[sliceInc++] = temp;
+			temp = "";
+			if(debug) {
+				Serial.println("Separator...");
 			}
+		} else {
+			temp += s[i];
 		}
 	}
-
-	return piezoPairs; // returns the length of the parsed command line
+	slicedCmd[sliceInc++] = temp;
+	
+	if(debug) {
+		Serial.print("Sliced command line (length: "); Serial.print(sliceInc); Serial.println(")");
+		for(uint8_t i = 0; i < (sliceInc); i++) {
+			Serial.print(slicedCmd[i]); Serial.print(" ");
+		}
+		Serial.println("");
+	}
+	
+	return sliceInc;
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | convertStrToInt														| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+uint8_t convertStrToInt(String s)
+{
+	char test[s.length()+1];
+	s.toCharArray(test, sizeof(test));
+	return atoi(test);
+}
+
+// /* -------------------------------------------------------------------------- */
+// /* -------------------------------------------------------------------------- */
+// /* | parseCommand															| */
+// /* -------------------------------------------------------------------------- */
+// /* -------------------------------------------------------------------------- */
+// uint8_t parseCommand(String com)
+// {
+// 	if(debug) {
+// 		Serial.println("\nEntering parser...");
+// 		Serial.println("------------------");
+// 	}
+//
+// 	String subPart;		// substring used for trimming
+// 	uint8_t i, piezoPairs, coord, index;
+// 	bool cont;			// Flag to continue slicing the command string
+// 	bool startMarkerSet, byteOne, firstPair, lastPair;
+//
+// 	if(debug) {
+// 		Serial.print("Received: "); Serial.print(com);
+// 		Serial.print(" ...length: "); Serial.println(com.length());
+// 	}
+// 	if(com.length() != 0) {
+// 		cont = true;
+// 		byteOne = true;
+// 		com.concat(" "); // Work around to be able to terminate the parsing of the string
+// 		i = 0;
+// 		while(cont) {
+// 			subPart = com.substring(0, com.indexOf(" "));
+// 			subPart.trim();
+//
+// 			/* Byte marker logic:
+// 			* - if B1 (col) & start marker      -> first byte
+// 			* - if B1 (col) & NOT start marker  -> any B1 (col)
+// 			* - if B2 (raw) & stop marker       -> last byte
+// 			* - if B2 (raw) & NOT stop marker   -> any B2 (raw)
+// 			*/
+// 			coord = subPart.toInt();
+// 			if(debug) {
+// 				Serial.print("Coord: "); Serial.println(coord, DEC);
+// 			}
+// 			if(byteOne) {
+// 				if(coord & START_MARKER_MASK) {
+// 					firstPair = true;
+// 					lastPair = false;
+// 				} else {
+// 					firstPair = false;
+// 				}
+// 			} else {
+// 				if(coord & STOP_MARKER_MASK) {
+// 					lastPair = true;
+// 				} else {
+// 					lastPair = false;
+// 				}
+// 			}
+//
+// 			if(byteOne & firstPair) {
+// 				if(debug) {
+// 					Serial.print("B1 (col) & ST\t--> "); Serial.println(coord, DEC);
+// 				}
+// 				index = 0;
+// 				HScoord[index][0] = (coord & ~START_MARKER_MASK);
+// 				byteOne = false;
+// 			} else if(byteOne & !firstPair) {
+// 				if(debug) {
+// 					Serial.print("B1 (col)\t--> "); Serial.println(coord, DEC);
+// 				}
+// 				HScoord[index][0] = coord;
+// 				byteOne = false;
+// 			} else if(!byteOne & !lastPair) {
+// 				if(debug) {
+// 					Serial.print("B2 (raw)\t--> "); Serial.println(coord, DEC);
+// 				}
+// 				HScoord[index][1] = coord;
+// 				index += 1;
+// 				byteOne = true;
+// 			} else if(!byteOne & lastPair) {
+// 				if(debug) {
+// 					Serial.print("B2 (raw) & SP\t--> "); Serial.println(coord, DEC);
+// 				}
+// 				HScoord[index][1] = (coord & ~STOP_MARKER_MASK);
+// 				byteOne = true;
+// 				piezoPairs = index + 1;
+// 			} else {
+// 				if(debug) {
+// 					Serial.println("ERROR in pair matching!");
+// 				}
+// 				return -1;
+// 			}
+//
+// 			com.remove(0, com.indexOf(" ") + 1);
+// 			if(com.length() <= 0) cont = false;
+// 		}
+//
+// 		if(debug) {
+// 			Serial.print("\nCoordinates table ("); Serial.print(piezoPairs); Serial.println(" pairs):");
+// 			Serial.println("x\ty\n---------");
+// 			for(i = 0; i < piezoPairs; i++) {
+// 				Serial.print(HScoord[i][0], DEC);
+// 				Serial.print("\t"); Serial.println(HScoord[i][1], DEC);
+// 			}
+// 		}
+// 	}
+//
+// 	return piezoPairs; // returns the length of the parsed command line
+// }

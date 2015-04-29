@@ -60,6 +60,10 @@ void slaveRegister() {
 				i2cSlaveAvailable[i] = false;
 			}
 		}
+		
+		if(i2cSlaveAvailable[i] == true) {
+			slaveInitNotify(i2cSlaveAddresses[i], false);
+		}
 		if(debug) {
 			delay(DEBUG_MONITOR_DELAY_MS);
 			Serial.print("Slave @ address 0x"); Serial.print(i2cSlaveAddresses[i], HEX);
@@ -313,29 +317,34 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[MAX_COORD_PAIRS][2], uint8
 	uint8_t mod, sn, pi;		// index modulo, slave number, piezo index
 
 	if(debug) {
-		Serial.println("\nDistributing coordinates...");
+		Serial.print("\nDistributing coordinates... length: "); Serial.println(len);
 	}
 	
 	for(uint8_t i = 0; i < len; i++) {
 		// check column value of a pair and assign it to the corresponding slave
 		if(orig[i][0] < COLUMNS_PER_SLAVE) {
-			static uint8_t slaveAddress = i2cSlaveAddresses[0];
+			// static uint8_t slaveAddress = i2cSlaveAddresses[0];
 			mod = 0;
 			sn = 0;
 		} else if(orig[i][0] < (2 * COLUMNS_PER_SLAVE)) {
-			static uint8_t slaveAddress = i2cSlaveAddresses[1];
+			// static uint8_t slaveAddress = i2cSlaveAddresses[1];
 			mod = COLUMNS_PER_SLAVE;
 			sn = 1;
 		} else if(orig[i][0] < (3 * COLUMNS_PER_SLAVE)) {
-			static uint8_t slaveAddress = i2cSlaveAddresses[2];
+			// static uint8_t slaveAddress = i2cSlaveAddresses[2];
 			mod = 2 * COLUMNS_PER_SLAVE;
 			sn = 2;
 		} else if(orig[i][0] < (4 * COLUMNS_PER_SLAVE)) {
-			static uint8_t slaveAddress = i2cSlaveAddresses[3];
+			// static uint8_t slaveAddress = i2cSlaveAddresses[3];
 			mod = 3 * COLUMNS_PER_SLAVE;
 			sn = 3;
 		}
 		
+		if(debug) {
+			Serial.print("sn: "); Serial.print(sn, DEC);
+			Serial.print(" ...available? "); Serial.println((i2cSlaveAvailable[sn]) ? "yes" : "no");
+			
+		}
 		// work only for available devices
 		if(i2cSlaveAvailable[sn]) {
 			// calculate the linear position (piezo index) of the pair

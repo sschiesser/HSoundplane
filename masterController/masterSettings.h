@@ -42,10 +42,9 @@
 #define STOP_MARKER_MASK	0xF0		// bit mask to recognize serial stop byte (SP)
 
 #define STARTUP_WAIT_MS		50			// startup waiting time to let the slaves be ready
+#define INIT_WAIT_MS		500			// initialization waiting time to SEE slave getting ready
 
 #define SYNC_PIN_1			2			// pin used to measure time between events
-
-#define MAX_INTERFACE		1
 
 
 /* -------------------------------------------------------------------------- */
@@ -53,7 +52,7 @@
 /* | VARIABLES																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool debug = true;						// DEBUG FLAG!!
+bool debug = false;						// DEBUG FLAG!!
 
 #if(I2C_FAST_MODE > 0)					// i2c speed flag
   bool i2cFastMode = true;
@@ -64,6 +63,7 @@ bool debug = true;						// DEBUG FLAG!!
 bool syncPinState;
 
 String command;							// serial command to parse
+String slicedCmd[2 * MAX_COORD_PAIRS];	// command line sliced into integers
 
 uint8_t HScoord[MAX_COORD_PAIRS][2];	// HSoundplane coordinate pairs fetched
 										// from the serial command parsing
