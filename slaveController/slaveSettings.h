@@ -30,6 +30,7 @@
 
 #include "HSoundplane.h"
 
+#define SLAVE_ID			1
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 /* | MACROS																	| */
@@ -48,12 +49,28 @@
 
 #define SYNC_PIN_1			A0			// pin used to measure time between events
 
+#if(SLAVE_ID == 1)
+#define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR1
+#define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR1
+#elif(SLAVE_ID == 2)
+#define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR2
+#define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR2
+#elif(SLAVE_ID == 3)
+#define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR3
+#define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR3
+#elif(SLAVE_ID == 4)
+#define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR4
+#define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR4
+#else
+#define I2C_SLAVE_ADDRESS	0xFF
+#define I2C_SWITCH_ADDRESS	0xFF
+#endif
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 /* | VARIABLES																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool debug = false;				// DEBUG FLAG!!
+bool debug = true;				// DEBUG FLAG!!
 
 #if(I2C_FAST_MODE > 0)			// i2c speed flag
 	bool i2cFastMode = true;

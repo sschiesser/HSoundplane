@@ -30,7 +30,6 @@
 
 #include "drv2667.h"
 
-#define SLAVE_ID			4
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 /* | MACROS																	| */
@@ -55,29 +54,18 @@
 #define I2C_SLAVE_ADDR2		0x52		// i2c slave2 address
 #define I2C_SLAVE_ADDR3		0x53		// i2c slave3 address
 #define I2C_SLAVE_ADDR4		0x54 		// i2c slave4 address
-#define I2C_SWITCH_ADDR1	0x70		// i2c switch1 address (range: 0x70 - 0x77)
-#define I2C_SWITCH_ADDR2	0x71		// i2c switch2 address
-#define I2C_SWITCH_ADDR3	0x72		// i2c switch3 address
-#define I2C_SWITCH_ADDR4	0x73		// i2c switch4 address
+#define I2C_SWITCH_ADDR1	0x71		// i2c switch1 address (range: 0x70 - 0x77)
+#define I2C_SWITCH_ADDR2	0x72		// i2c switch2 address
+#define I2C_SWITCH_ADDR3	0x73		// i2c switch3 address
+#define I2C_SWITCH_ADDR4	0x74		// i2c switch4 address
 #define I2C_REGISTER_SET	0xFD
 #define I2C_INIT_NOTIFY		0xFE	
-#define I2C_INIT_COMMAND	0xFF		// first i2c message byte to announce init sequence
-#if(SLAVE_ID == 1)
-#define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR1
-#define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR1
-#elif(SLAVE_ID == 2)
-#define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR2
-#define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR2
-#elif(SLAVE_ID == 3)
-#define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR3
-#define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR3
-#elif(SLAVE_ID == 4)
-#define I2C_SLAVE_ADDRESS	I2C_SLAVE_ADDR4
-#define I2C_SWITCH_ADDRESS	I2C_SWITCH_ADDR4
-#else
-#define I2C_SLAVE_ADDRESS	0xFF
-#define I2C_SWITCH_ADDRESS	0xFF
-#endif
+
+#define SERIAL_CMD_MODE		0xFF
+#define CMD_PIEZO_OFF		0x00
+#define CMD_DRIVERS_OFF		0x01
+#define CMD_DRIVERS_ON		0x02
+
 
 // Pinout of the arduino nano on the driver board
 #define LED1_PIN			3			// LED1 -> device started up
@@ -135,6 +123,8 @@ extern uint8_t piCnt[NUMBER_OF_SLAVES];
 extern int8_t i2cSlaveAddresses[NUMBER_OF_SLAVES];
 extern int8_t i2cSwitchAddresses[NUMBER_OF_SLAVES];
 extern bool i2cSlaveAvailable[NUMBER_OF_SLAVES];
+extern bool allPiezosOff;
+extern bool allDriversOff;
 
 
 /* -------------------------------------------------------------------------- */

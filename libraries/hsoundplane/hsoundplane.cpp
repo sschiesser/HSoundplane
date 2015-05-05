@@ -323,23 +323,35 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[MAX_COORD_PAIRS][2], uint8
 	for(uint8_t i = 0; i < len; i++) {
 		// check column value of a pair and assign it to the corresponding slave
 		if(orig[i][0] < COLUMNS_PER_SLAVE) {
-			// static uint8_t slaveAddress = i2cSlaveAddresses[0];
 			mod = 0;
 			sn = 0;
 		} else if(orig[i][0] < (2 * COLUMNS_PER_SLAVE)) {
-			// static uint8_t slaveAddress = i2cSlaveAddresses[1];
 			mod = COLUMNS_PER_SLAVE;
 			sn = 1;
 		} else if(orig[i][0] < (3 * COLUMNS_PER_SLAVE)) {
-			// static uint8_t slaveAddress = i2cSlaveAddresses[2];
 			mod = 2 * COLUMNS_PER_SLAVE;
 			sn = 2;
 		} else if(orig[i][0] < (4 * COLUMNS_PER_SLAVE)) {
-			// static uint8_t slaveAddress = i2cSlaveAddresses[3];
 			mod = 3 * COLUMNS_PER_SLAVE;
 			sn = 3;
+		} else if(orig[i][0] == SERIAL_CMD_MODE) {
+			if(debug) {
+				Serial.print("Entering command mode: 0x"); Serial.println(orig[i][1], HEX);
+			}
+			switch(orig[i][1]) {
+				case CMD_PIEZO_OFF:
+					allPiezosOff = true;
+					break;
+				case CMD_DRIVERS_OFF:
+					allDriversOff = true;
+					break;
+				case CMD_DRIVERS_ON:
+					allDriversOff = false;
+					break;
+				default:
+					break;
+			}
 		}
-		
 		if(debug) {
 			Serial.print("sn: "); Serial.print(sn, DEC);
 			Serial.print(" ...available? "); Serial.println((i2cSlaveAvailable[sn]) ? "yes" : "no");
@@ -373,26 +385,26 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[MAX_COORD_PAIRS][2], uint8
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 void sendToSlave(uint8_t sn, uint8_t *mes, uint8_t len) {
-  if(debug) {
-    Serial.print("\nWriting to 0x");
-    Serial.print(sn, HEX);
-    Serial.print(": ");
-  }
+	if(debug) {
+		Serial.print("\nWriting to 0x");
+		Serial.print(sn, HEX);
+		Serial.print(": ");
+	}
   
-  Wire.beginTransmission(sn);		// address slave @ address sn
-  Wire.write(I2C_REGISTER_SET);		// command byte with register set message
-  for(uint8_t i = 0; i < len; i++) {
-    if(debug) {
-      Serial.print(mes[i], DEC); Serial.print("(0x");
-	  Serial.print(mes[i], HEX); Serial.print(")");
-      if(i < (len-1)) Serial.print(" - ");
-    }
-    Wire.write(mes[i]);				// send all indexes associated to this slave
-  }
-  if(debug) {
-	  Serial.println("");
-  }
-  Wire.endTransmission();
+	Wire.beginTransmission(sn);		// address slave @ address sn
+	Wire.write(I2C_REGISTER_SET);		// command byte with register set message
+	for(uint8_t i = 0; i < len; i++) {
+		if(debug) {
+			Serial.print(mes[i], DEC); Serial.print("(0x");
+			Serial.print(mes[i], HEX); Serial.print(")");
+			if(i < (len-1)) Serial.print(" - ");
+		}
+		Wire.write(mes[i]);				// send all indexes associated to this slave
+	}
+	if(debug) {
+		Serial.println("");
+	}
+	Wire.endTransmission();
 }
 
 

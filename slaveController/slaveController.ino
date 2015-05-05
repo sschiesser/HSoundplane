@@ -67,7 +67,7 @@ void setup()
 	digitalWrite(LOAD_PIN, LOW);		// storage clock active on rising edge
 	digitalWrite(OE_PIN, LOW);			// enable latch outputs
   
-	switchAddress = (I2C_SWITCH_ADDRESS - I2C_SWITCH_ADDR1);
+	switchAddress = (I2C_SWITCH_ADDRESS - (I2C_SWITCH_ADDR1-1));
 	pinMode(SW_ADDR_0, OUTPUT);			// i2c switch address
 	digitalWrite(SW_ADDR_0, (switchAddress & 0x01));
 	pinMode(SW_ADDR_1, OUTPUT);
@@ -87,12 +87,14 @@ void setup()
 	slaveWriteFlag = false;				// slave writing command flag...
   
   	if(debug) {
-		Serial.println("\nStarting up slave controller...");
+		Serial.print("\nStarting up slave controller... #"); Serial.println(SLAVE_ID, DEC);
 		Serial.println("*************************************");
 		Serial.print("serial:\n\t- port @ "); Serial.println(SERIAL_SPEED, DEC);
 		Serial.print("i2c:\n\t- port @ "); Serial.println((i2cFastMode) ? "400 kHz" : "100 kHz");
 		Serial.print("\t- own address: 0x"); Serial.println(I2C_SLAVE_ADDRESS, HEX);
 		Serial.print("\t- switch address: 0x"); Serial.println(I2C_SWITCH_ADDRESS, HEX);
+		Serial.print("\t- switch address pins: "); Serial.print(switchAddress & 0x04);
+		Serial.print(" / "); Serial.print(switchAddress & 0x02); Serial.print(" / "); Serial.println(switchAddress & 0x01);
 		Serial.println("piezos:\n\t- raws: 9\n\t- columns: 8\n\t -> available piezos: 72");
 		Serial.println("*************************************\n");
 
@@ -293,9 +295,6 @@ void receiveEvent(int howmany)
 			
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);
-			break;
-		
-		case I2C_INIT_COMMAND:
 			break;
 		
 		default:

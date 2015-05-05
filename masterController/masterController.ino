@@ -50,6 +50,8 @@ void setup()
 	
 	delay(STARTUP_WAIT_MS);
 	
+	allPiezosOff = false;
+
 	// Setting up communication...
 	Serial.begin(SERIAL_SPEED);
 	Wire.begin(); // Start i2c
@@ -83,6 +85,7 @@ void setup()
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);
 			slaveInitNotify(i2cSlaveAddresses[i], setupOk);
+			sendToSlave(i2cSlaveAddresses[i], NULL, 0);
 		}
 	}
 }
@@ -108,6 +111,7 @@ void loop()
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
 
+			command.trim();
 			strLength = command.length();
 			if(debug) {
 				Serial.print("Command: "); Serial.println(command);
@@ -138,7 +142,13 @@ void loop()
 
 			for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
 				if(i2cSlaveAvailable[i]) {
-					if(piCnt[i] > 0) {
+					if(allPiezosOff) {
+						if(debug) {
+							Serial.println("Sending all piezo off command to slave");
+						}
+						sendToSlave(i2cSlaveAddresses[i], NULL, 0);
+						allPiezosOff = false;
+					} else if(piCnt[i] > 0) {
 						sendToSlave(i2cSlaveAddresses[i], piezoMatrix[i], piCnt[i]);
 					}
 				}
