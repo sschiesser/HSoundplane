@@ -339,15 +339,27 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[MAX_COORD_PAIRS][2], uint8
 				Serial.print("Entering command mode: 0x"); Serial.println(orig[i][1], HEX);
 			}
 			switch(orig[i][1]) {
-				case CMD_PIEZO_OFF:
-					allPiezosOff = true;
+				case CMD_PIEZO_ALL_OFF:
+					piezoOff[4] = true;
 					break;
-				case CMD_DRIVERS_OFF:
-					allDriversOff = true;
+				case CMD_PIEZO_S1_OFF:
+					piezoOff[0] = true;
 					break;
-				case CMD_DRIVERS_ON:
-					allDriversOff = false;
+				case CMD_PIEZO_S2_OFF:
+					piezoOff[1] = true;
 					break;
+				case CMD_PIEZO_S3_OFF:
+					piezoOff[2] = true;
+					break;
+				case CMD_PIEZO_S4_OFF:
+					piezoOff[3] = true;
+					break;
+				// case CMD_DRIVERS_OFF:
+				// 	allDriversOff = true;
+				// 	break;
+				// case CMD_DRIVERS_ON:
+				// 	allDriversOff = false;
+				// 	break;
 				default:
 					break;
 			}

@@ -52,7 +52,7 @@
 /* | VARIABLES																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool debug = true;						// DEBUG FLAG!!
+bool debug = false;						// DEBUG FLAG!!
 
 #if(I2C_FAST_MODE > 0)					// i2c speed flag
   bool i2cFastMode = true;
@@ -62,8 +62,8 @@ bool debug = true;						// DEBUG FLAG!!
   
 bool syncPinState;
 
-bool allPiezosOff;
-bool allDriversOff;
+bool piezoOff[5];
+bool driverOff[5];
 
 String command;							// serial command to parse
 String slicedCmd[2 * MAX_COORD_PAIRS];	// command line sliced into integers

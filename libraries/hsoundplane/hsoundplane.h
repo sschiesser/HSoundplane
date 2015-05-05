@@ -62,9 +62,13 @@
 #define I2C_INIT_NOTIFY		0xFE	
 
 #define SERIAL_CMD_MODE		0xFF
-#define CMD_PIEZO_OFF		0x00
-#define CMD_DRIVERS_OFF		0x01
-#define CMD_DRIVERS_ON		0x02
+#define CMD_PIEZO_ALL_OFF	0x00
+#define CMD_PIEZO_S1_OFF	0x01
+#define CMD_PIEZO_S2_OFF	0x02
+#define CMD_PIEZO_S3_OFF	0x03
+#define CMD_PIEZO_S4_OFF	0x04
+#define CMD_DRIVERS_OFF		0x10
+#define CMD_DRIVERS_ON		0x11
 
 
 // Pinout of the arduino nano on the driver board
@@ -123,8 +127,8 @@ extern uint8_t piCnt[NUMBER_OF_SLAVES];
 extern int8_t i2cSlaveAddresses[NUMBER_OF_SLAVES];
 extern int8_t i2cSwitchAddresses[NUMBER_OF_SLAVES];
 extern bool i2cSlaveAvailable[NUMBER_OF_SLAVES];
-extern bool allPiezosOff;
-extern bool allDriversOff;
+extern bool piezoOff[5];
+extern bool driverOff[5];
 
 
 /* -------------------------------------------------------------------------- */
