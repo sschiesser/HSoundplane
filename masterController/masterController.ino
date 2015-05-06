@@ -66,8 +66,6 @@ void setup()
 		Serial.print("serial:\n\t- port @ "); Serial.println(SERIAL_SPEED, DEC);
 		Serial.print("i2c:\n\t- port @ "); Serial.println((i2cFastMode) ? "400 kHz" : "100 kHz");
 		Serial.print("slaves:\n\t- quantity: "); Serial.println(NUMBER_OF_SLAVES, DEC);
-		Serial.print("\t- piezos/slave: "); Serial.println(PIEZOS_PER_SLAVE, DEC);
-		Serial.print("\t -> available piezos: "); Serial.println(MAX_PIEZO_VAL, DEC);
 		Serial.println("**************************************\n");
 	}
 

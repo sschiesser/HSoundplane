@@ -298,7 +298,7 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 void slaveInitNotify(int8_t addr, bool notification)
 {
 	Wire.beginTransmission(addr);
-	Wire.write(I2C_INIT_NOTIFY);
+	Wire.write(i2cCmd_notify);
 	Wire.write((notification) ? 1 : 0);
 	Wire.endTransmission();
 	if(debug) {
@@ -339,19 +339,19 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[MAX_COORD_PAIRS][2], uint8
 				Serial.print("Entering command mode: 0x"); Serial.println(orig[i][1], HEX);
 			}
 			switch(orig[i][1]) {
-				case CMD_PIEZO_ALL_OFF:
+				case sCmd_piezoOffAll:
 					piezoOff[4] = true;
 					break;
-				case CMD_PIEZO_S1_OFF:
+				case sCmd_piezoOffS1:
 					piezoOff[0] = true;
 					break;
-				case CMD_PIEZO_S2_OFF:
+				case sCmd_piezoOffS2:
 					piezoOff[1] = true;
 					break;
-				case CMD_PIEZO_S3_OFF:
+				case sCmd_piezoOffS3:
 					piezoOff[2] = true;
 					break;
-				case CMD_PIEZO_S4_OFF:
+				case sCmd_piezoOffS4:
 					piezoOff[3] = true;
 					break;
 				// case CMD_DRIVERS_OFF:
@@ -404,7 +404,7 @@ void sendToSlave(uint8_t sn, uint8_t *mes, uint8_t len) {
 	}
   
 	Wire.beginTransmission(sn);		// address slave @ address sn
-	Wire.write(I2C_REGISTER_SET);		// command byte with register set message
+	Wire.write(i2cCmd_regSet);		// command byte with register set message
 	for(uint8_t i = 0; i < len; i++) {
 		if(debug) {
 			Serial.print(mes[i], DEC); Serial.print("(0x");

@@ -67,7 +67,7 @@ void setup()
 	digitalWrite(LOAD_PIN, LOW);		// storage clock active on rising edge
 	digitalWrite(OE_PIN, LOW);			// enable latch outputs
   
-	switchAddress = (I2C_SWITCH_ADDRESS - (I2C_SWITCH_ADDR1-1));
+	switchAddress = (I2C_SWITCH_ADDRESS - I2C_SWITCH_ADDR1);
 	pinMode(SW_ADDR_0, OUTPUT);			// i2c switch address
 	digitalWrite(SW_ADDR_0, (switchAddress & 0x01));
 	pinMode(SW_ADDR_1, OUTPUT);
@@ -217,11 +217,10 @@ void receiveEvent(int howmany)
 	if(debug) {
 		Serial.print("\nI2C message received... length: "); Serial.print(howmany, DEC);
 		Serial.print(" first byte: 0x"); Serial.println(received, HEX);
-		delay(DEBUG_MONITOR_DELAY_MS);
 	}
 	
 	switch(received) {
-		case I2C_REGISTER_SET:
+		case i2cCmd_regSet:
 		if(debug) {
 			Serial.println("Setting shift registers...");
 		}
@@ -238,7 +237,6 @@ void receiveEvent(int howmany)
 				decount--;
 				if(debug) {
 					Serial.print("Received "); Serial.print(received, DEC);
-					delay(DEBUG_MONITOR_DELAY_MS);
 				}
 				if(received < 32) {
 					piezoVal1 &= piezoArray1[received];
@@ -271,7 +269,7 @@ void receiveEvent(int howmany)
 			digitalWrite(SYNC_PIN_1, syncPinState);
 			break;
 		
-		case I2C_INIT_NOTIFY:
+		case i2cCmd_notify:
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);
 			
