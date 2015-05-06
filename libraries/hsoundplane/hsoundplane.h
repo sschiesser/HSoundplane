@@ -67,8 +67,16 @@
 #define CMD_PIEZO_S2_OFF	0x02
 #define CMD_PIEZO_S3_OFF	0x03
 #define CMD_PIEZO_S4_OFF	0x04
-#define CMD_DRIVERS_OFF		0x10
-#define CMD_DRIVERS_ON		0x11
+#define CMD_DRV_ALL_OFF		0x10
+#define CMD_DRV_D1_OFF		0x11
+#define CMD_DRV_D2_OFF		0x12
+#define CMD_DRV_D3_OFF		0x13
+#define CMD_DRV_D4_OFF		0x14
+#define CMD_DRV_ALL_ON		0x20
+#define CMD_DRV_D1_ON		0x21
+#define CMD_DRV_D2_ON		0x22
+#define CMD_DRV_D3_ON		0x23
+#define CMD_DRV_D4_ON		0x24
 
 
 // Pinout of the arduino nano on the driver board
