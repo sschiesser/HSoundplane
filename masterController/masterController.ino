@@ -50,10 +50,11 @@ void setup()
 	
 	delay(STARTUP_WAIT_MS);
 	
-	for(uint8_t i = 0; i < 5; i++) {
-		piezoOff[i] = false;
-		driverOff[i] = false;
+	for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
+		HSf.piezoOff[i] = false;
 	}
+	HSf.piezoOffAll = false;
+	HSf.drvOffAll = false;
 
 	// Setting up communication...
 	Serial.begin(SERIAL_SPEED);
@@ -143,12 +144,12 @@ void loop()
 
 			for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
 				if(i2cSlaveAvailable[i]) {
-					if(piezoOff[4]) {
+					if(HSf.piezoOffAll) {
 						if(debug) {
 							Serial.println("Sending all piezo off command to slave");
 						}
 						sendToSlave(i2cSlaveAddresses[i], NULL, 0);
-					} else if(piezoOff[i]) {
+					} else if(HSf.piezoOff[i]) {
 						if(debug) {
 							Serial.println("Sending piezo off command to slave #"); Serial.print(i, DEC);
 						}
@@ -157,10 +158,10 @@ void loop()
 						sendToSlave(i2cSlaveAddresses[i], piezoMatrix[i], piCnt[i]);
 					}
 				}
-				piezoOff[i] = false;
+				HSf.piezoOff[i] = false;
 				piCnt[i] = 0;
 			}
-			piezoOff[4] = false;
+			HSf.piezoOffAll = false;
 
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// measure sending time

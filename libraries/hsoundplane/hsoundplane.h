@@ -64,7 +64,7 @@ enum i2cCommand {
 // Serial commands
 // ---------------
 // Commands from computer to master sent like a coordinate pair: 0xFF - CMD
-//
+// If CMD needs more arguments (noted CMD*), the following pair contains the values
 #define SERIAL_CMD_MODE		0xFF		// serial command start byte
 enum serialCommand {
 	// switch off piezos (i.e. close shift registers)
@@ -75,107 +75,10 @@ enum serialCommand {
 	sCmd_piezoOffS4,					// slave #4
 	
 	// switch on/off drivers drv2667
-	sCmd_drvOnAll,						// all on
 	sCmd_drvOffAll,						// all off
-	// slave #1...
-	sCmd_drvOnS1All,					// all on
-	sCmd_drvOnS1D1,						// drv1 on
-	sCmd_drvOnS1D2,						// drv2 on
-	sCmd_drvOnS1D3,						// drv3 on
-	sCmd_drvOnS1D4,						// drv4 on
-	sCmd_drvOnS1D5,						// drv5 on
-	sCmd_drvOnS1D6,						// drv6 on
-	sCmd_drvOnS1D7,						// drv7 on
-	sCmd_drvOnS1D8,						// drv8 on
-	sCmd_drvOffS1All,					// all off
-	sCmd_drvOffS1D1,					// drv1 off
-	sCmd_drvOffS1D2,					// drv2 off
-	sCmd_drvOffS1D3,					// drv3 off
-	sCmd_drvOffS1D4,					// drv4 off
-	sCmd_drvOffS1D5,					// drv5 off
-	sCmd_drvOffS1D6,					// drv6 off
-	sCmd_drvOffS1D7,					// drv7 off
-	sCmd_drvOffS1D8,					// drv8 off
-	// slave #2
-	sCmd_drvOnS2All,					// all on
-	sCmd_drvOnS2D1,						// drv1 on
-	sCmd_drvOnS2D2,						// drv2 on
-	sCmd_drvOnS2D3,						// drv3 on
-	sCmd_drvOnS2D4,						// drv4 on
-	sCmd_drvOnS2D5,						// drv5 on
-	sCmd_drvOnS2D6,						// drv6 on
-	sCmd_drvOnS2D7,						// drv7 on
-	sCmd_drvOnS2D8,						// drv8 on
-	sCmd_drvOffS2All,					// all off
-	sCmd_drvOffS2D1,					// drv1 off
-	sCmd_drvOffS2D2,					// drv2 off
-	sCmd_drvOffS2D3,					// drv3 off
-	sCmd_drvOffS2D4,					// drv4 off
-	sCmd_drvOffS2D5,					// drv5 off
-	sCmd_drvOffS2D6,					// drv6 off
-	sCmd_drvOffS2D7,					// drv7 off
-	sCmd_drvOffS2D8,					// drv8 off
-	// slave #3
-	sCmd_drvOnS3All,					// all on
-	sCmd_drvOnS3D1,						// drv1 on
-	sCmd_drvOnS3D2,						// drv2 on
-	sCmd_drvOnS3D3,						// drv3 on
-	sCmd_drvOnS3D4,						// drv4 on
-	sCmd_drvOnS3D5,						// drv5 on
-	sCmd_drvOnS3D6,						// drv6 on
-	sCmd_drvOnS3D7,						// drv7 on
-	sCmd_drvOnS3D8,						// drv8 on
-	sCmd_drvOffS3All,					// all off
-	sCmd_drvOffS3D1,					// drv1 off
-	sCmd_drvOffS3D2,					// drv2 off
-	sCmd_drvOffS3D3,					// drv3 off
-	sCmd_drvOffS3D4,					// drv4 off
-	sCmd_drvOffS3D5,					// drv5 off
-	sCmd_drvOffS3D6,					// drv6 off
-	sCmd_drvOffS3D7,					// drv7 off
-	sCmd_drvOffS3D8,					// drv8 off
-	// slave #4
-	sCmd_drvOnS4All,					// all on
-	sCmd_drvOnS4D1,						// drv1 on
-	sCmd_drvOnS4D2,						// drv2 on
-	sCmd_drvOnS4D3,						// drv3 on
-	sCmd_drvOnS4D4,						// drv4 on
-	sCmd_drvOnS4D5,						// drv5 on
-	sCmd_drvOnS4D6,						// drv6 on
-	sCmd_drvOnS4D7,						// drv7 on
-	sCmd_drvOnS4D8,						// drv8 on
-	sCmd_drvOffS4All,					// all off
-	sCmd_drvOffS4D1,					// drv1 off
-	sCmd_drvOffS4D2,					// drv2 off
-	sCmd_drvOffS4D3,					// drv3 off
-	sCmd_drvOffS4D4,					// drv4 off
-	sCmd_drvOffS4D5,					// drv5 off
-	sCmd_drvOffS4D6,					// drv6 off
-	sCmd_drvOffS4D7,					// drv7 off
-	sCmd_drvOffS4D8,					// drv8 off
-	
-	// set driver gains
-	sCmd_
+	sCmd_drvOn,							// driver on * (slave# - gain)
+	sCmd_drvOff,						// driver off * (slave# - ...)
 };
-// #define CMD_PIEZO_ALL_OFF	0x00		// switch off all piezos (shift reg closed)
-// #define CMD_PIEZO_S1_OFF	0x01		// switch off piezo 1
-// #define CMD_PIEZO_S2_OFF	0x02		// switch off piezo 2
-// #define CMD_PIEZO_S3_OFF	0x03		// switch off piezo 3
-// #define CMD_PIEZO_S4_OFF	0x04		// switch off piezo 4
-// #define CMD_DRV_ALL_OFF		0x10		// switch off all drivers (standby)
-// #define CMD_DRV_D1_OFF		0x11		// switch off driver 1
-// #define CMD_DRV_D2_OFF		0x12		// switch off driver 2
-// #define CMD_DRV_D3_OFF		0x13		// switch off driver 3
-// #define CMD_DRV_D4_OFF		0x14		// switch off driver 4
-// #define CMD_DRV_ALL_ON		0x20		// switch on all drivers
-// #define CMD_DRV_D1_ON		0x21		// switch on driver 1
-// #define CMD_DRV_D2_ON		0x22		// switch on driver 2
-// #define CMD_DRV_D3_ON		0x23		// switch on driver 3
-// #define CMD_DRV_D4_ON		0x24		// switch on driver 4
-// #define CMD_DRV_GAIN_0		0x30		// set driver gain to 0 (25Vpp)
-// #define CMD_DRV_GAIN_1		0x31		// set driver gain to 1 (50Vpp)
-// #define CMD_DRV_GAIN_2		0x32		// set driver gain to 2 (75Vpp)
-// #define CMD_DRV_GAIN_3		0x33		// set driver gain to 3 (100Vpp)
 
 
 // Pinout of the arduino nano on the driver board
@@ -199,9 +102,6 @@ enum serialCommand {
 #define LED_ON				LOW			// macro to set if LEDs are switched on HIGH or LOW
 #define LED_OFF				HIGH		// and never forget it after that
 
-
-#define DEBUG_MONITOR_DELAY_MS	20		// waiting time for debug Serial.print
-
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 /* | VARIABLES																| */
@@ -223,6 +123,14 @@ const uint32_t piezoArray2[32] = {
 const uint32_t piezoArray3[8] = {
 	0xFFFFFFFE, 0xFFFFFFFD, 0xFFFFFFFB, 0xFFFFFFF7, 0xFFFFFFEF, 0xFFFFFFDF, 0xFFFFFFBF, 0xFFFFFF7F};			// row 8 (8/9)
 
+typedef struct HSflags{
+	bool piezoOff[NUMBER_OF_SLAVES];
+	bool piezoOffAll;
+	bool drvOffAll;
+	bool drvOff;
+	bool drvOn;
+};
+
 // extern...
 extern bool debug;
 extern SPISettings settingsA;
@@ -232,8 +140,9 @@ extern uint8_t piCnt[NUMBER_OF_SLAVES];
 extern int8_t i2cSlaveAddresses[NUMBER_OF_SLAVES];
 extern int8_t i2cSwitchAddresses[NUMBER_OF_SLAVES];
 extern bool i2cSlaveAvailable[NUMBER_OF_SLAVES];
-extern bool piezoOff[5];
-extern bool driverOff[5];
+extern struct HSflags HSf;
+// extern bool piezoOff[5];
+// extern bool driverOff[5];
 
 
 /* -------------------------------------------------------------------------- */

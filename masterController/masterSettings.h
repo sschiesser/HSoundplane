@@ -62,8 +62,9 @@ bool debug = true;						// DEBUG FLAG!!
   
 bool syncPinState;
 
-bool piezoOff[5];
-bool driverOff[5];
+struct HSflags HSf;
+// bool piezoOff[5];
+// bool driverOff[5];
 
 String command;							// serial command to parse
 String slicedCmd[2 * MAX_COORD_PAIRS];	// command line sliced into integers

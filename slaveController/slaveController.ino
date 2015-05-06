@@ -193,7 +193,6 @@ void requestEvent()
 	if(debug) {
 		Serial.print("i2c registration request received... sending own address 0x");
 		Serial.println(I2C_SLAVE_ADDRESS, HEX);
-		delay(DEBUG_MONITOR_DELAY_MS);
 	}
 	Wire.write(I2C_SLAVE_ADDRESS);
 

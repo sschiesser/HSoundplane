@@ -65,7 +65,6 @@ void slaveRegister() {
 			slaveInitNotify(i2cSlaveAddresses[i], false);
 		}
 		if(debug) {
-			delay(DEBUG_MONITOR_DELAY_MS);
 			Serial.print("Slave @ address 0x"); Serial.print(i2cSlaveAddresses[i], HEX);
 			Serial.println((i2cSlaveAvailable[i]) ? " available" : " NOT available");
 		}
@@ -107,7 +106,6 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 				} else {
 					Serial.println("\t\t\tERROR!");
 				}
-				delay(DEBUG_MONITOR_DELAY_MS);
 			}
 			
 			// reset driver
@@ -123,7 +121,6 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 				} else {
 					Serial.println("\t\t\tERROR!");
 				}
-				delay(DEBUG_MONITOR_DELAY_MS);
 			}
 		}
 		
@@ -139,7 +136,6 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 			} else {
 				Serial.println("\t\t\tERROR!\n");
 			}
-			delay(DEBUG_MONITOR_DELAY_MS);
 		}
 	}
   
@@ -164,7 +160,6 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 				} else {
 					Serial.println("\t\t\tERROR!");					
 				}
-				delay(DEBUG_MONITOR_DELAY_MS);
 			}
 			
 			// wake up
@@ -180,7 +175,6 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 				} else {
 					Serial.println("\t\t\t\tERROR!");
 				}
-				delay(DEBUG_MONITOR_DELAY_MS);
 			}
 
 			// set mux & gain
@@ -196,7 +190,6 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 				} else {
 					Serial.println("\tERROR!");
 				}
-				delay(DEBUG_MONITOR_DELAY_MS);
 			}
 			
 			// enable amplifier
@@ -212,7 +205,6 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 				} else {
 					Serial.println("\t\t\tERROR!");
 				}
-				delay(DEBUG_MONITOR_DELAY_MS);
 			}				
 		}
 		
@@ -228,7 +220,6 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 			} else {
 				Serial.println("\t\t\tERROR!");
 			}
-			delay(DEBUG_MONITOR_DELAY_MS);
 		}
 		
 		
@@ -251,7 +242,6 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 				} else {
 					Serial.println("\t\t\tERROR!");					
 				}
-				delay(DEBUG_MONITOR_DELAY_MS);
 			}
       
 			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
@@ -266,7 +256,6 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 				} else {
 					Serial.println("\t\t\tERROR!");					
 				}
-				delay(DEBUG_MONITOR_DELAY_MS);
 			}
 		}
 		
@@ -282,7 +271,6 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 			} else {
 				Serial.println("\t\t\tERROR!");
 			}
-			delay(DEBUG_MONITOR_DELAY_MS);
 		}
 	}
 	
@@ -340,26 +328,29 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[MAX_COORD_PAIRS][2], uint8
 			}
 			switch(orig[i][1]) {
 				case sCmd_piezoOffAll:
-					piezoOff[4] = true;
+					HSf.piezoOffAll = true;
 					break;
 				case sCmd_piezoOffS1:
-					piezoOff[0] = true;
+					HSf.piezoOff[0] = true;
 					break;
 				case sCmd_piezoOffS2:
-					piezoOff[1] = true;
+					HSf.piezoOff[1] = true;
 					break;
 				case sCmd_piezoOffS3:
-					piezoOff[2] = true;
+					HSf.piezoOff[2] = true;
 					break;
 				case sCmd_piezoOffS4:
-					piezoOff[3] = true;
+					HSf.piezoOff[3] = true;
 					break;
-				// case CMD_DRIVERS_OFF:
-				// 	allDriversOff = true;
-				// 	break;
-				// case CMD_DRIVERS_ON:
-				// 	allDriversOff = false;
-				// 	break;
+				case sCmd_drvOffAll:
+					HSf.drvOffAll = true;
+					break;
+				case sCmd_drvOn:
+					HSf.drvOn = true;
+					break;
+				case sCmd_drvOff:
+					HSf.drvOff = true;
+					break;
 				default:
 					break;
 			}
