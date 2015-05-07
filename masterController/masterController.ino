@@ -31,6 +31,8 @@
 #include "HSoundplane.h"
 #include "masterSettings.h"
 
+String command;							// serial command to parse
+
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 /* | setup																	| */
@@ -99,33 +101,36 @@ void setup()
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 void loop()
-{
-	uint8_t strLength;
-  
+{  
+	char c;
+	
 	// Collecting characters on the serial port started by '[' and terminated by ']'.
 	// Then process the received command line
 	if(Serial.available()) {
-		char c = (char)Serial.read();
+		c = Serial.read();
     
 		if(c == '[') {
 			command = "";
+			if(debug) {
+				Serial.println("'[' found, starting receiving");
+			}
 		} else if(c == ']') {
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
 
 			// command.trim();
-			strLength = command.length();
+			uint8_t strLength = command.length();
 			if(debug) {
-				Serial.print("Command: "); Serial.println(command);
-				Serial.print("Length: "); Serial.println(strLength);
+				Serial.print("\n****************************************\nNew command: "); Serial.print(command);
+				Serial.print(" (length: "); Serial.print(strLength); Serial.println(")");
 			}
 			strLength = sliceCommand(command);
 
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// measuring slicing time
 
-			uint8_t HSpairs = strLength / 2;
-			for(uint8_t i = 0; i < HSpairs; i++) {
+			uint8_t pairs = strLength / 2;
+			for(uint8_t i = 0; i < pairs; i++) {
 				HSd.HScoord[i][0] = convertStrToInt(slicedCmd[2*i]);
 				HSd.HScoord[i][1] = convertStrToInt(slicedCmd[(2*i)+1]);
 				if(debug) {
@@ -137,7 +142,7 @@ void loop()
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// measure converting time
 
-			distributeCoordinates(HSpairs, HSd.HScoord, HSd.HSpiezo);
+			distributeCoordinates(pairs, HSd.HScoord, HSd.HSpiezo);
 
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// measure distributing time
@@ -168,6 +173,9 @@ void loop()
 
 		} else {
 			command += c;
+			if(debug) {
+				Serial.print(c); Serial.print(" - "); Serial.println(command);
+			}
 		}
 	}
 }
@@ -183,6 +191,7 @@ uint8_t sliceCommand(String s)
 	if(debug) {
 		Serial.println("\nSlicing command line into ints...");
 		Serial.println("---------------------------------");
+		Serial.print("Received command length: "); Serial.println(s.length(), DEC);
 	}
 	
 	String temp = "";

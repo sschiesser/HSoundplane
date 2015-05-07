@@ -35,7 +35,7 @@
 /* -------------------------------------------------------------------------- */
 #define I2C_FAST_MODE		1			// 0 -> standad mode (100 kHz) i2c,
 										// 1 -> fast mode (400 kHz)
-#define SERIAL_SPEED		38400		// serial communication speed for
+#define SERIAL_SPEED		230400		// serial communication speed for
 										// 1. host command reception (CDC or rawHID)
 										// 2. debugging
 #define START_MARKER_MASK	0xE0		// bit mask to recognize serial start byte (ST)
@@ -62,7 +62,7 @@ bool debug = true;						// DEBUG FLAG!!
   
 bool syncPinState;
 
-String command;							// serial command to parse
+// String command;							// serial command to parse
 String slicedCmd[2 * HS_COORD_MAX];		// command line sliced into integers
 
 // extern...
