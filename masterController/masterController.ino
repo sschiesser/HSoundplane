@@ -50,11 +50,11 @@ void setup()
 	
 	delay(STARTUP_WAIT_MS);
 	
-	for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
-		HSf.piezoOff[i] = false;
+	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
+		HSd.piezoOff[i] = false;
 	}
-	HSf.piezoOffAll = false;
-	HSf.drvOffAll = false;
+	HSd.piezoOffAll = false;
+	HSd.drvOffAll = false;
 
 	// Setting up communication...
 	Serial.begin(SERIAL_SPEED);
@@ -66,28 +66,28 @@ void setup()
 		Serial.println("*************************************");
 		Serial.print("serial:\n\t- port @ "); Serial.println(SERIAL_SPEED, DEC);
 		Serial.print("i2c:\n\t- port @ "); Serial.println((i2cFastMode) ? "400 kHz" : "100 kHz");
-		Serial.print("slaves:\n\t- quantity: "); Serial.println(NUMBER_OF_SLAVES, DEC);
+		Serial.print("slaves:\n\t- quantity: "); Serial.println(HS_SLAVE_NUMBER, DEC);
 		Serial.println("**************************************\n");
 	}
 
 	// Initializing slaves
 	slaveRegister();
-	for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
+	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
 		delay(INIT_WAIT_MS);
 		
 		bool reset = true;
 		bool on = true;
 		uint8_t gain = 3;
-		if(i2cSlaveAvailable[i]) {
+		if(HSd.i2cSlaveAvailable[i]) {
 			if(debug) {
-				Serial.print("\nSetting up slave @ 0x"); Serial.print(i2cSlaveAddresses[i], HEX);
+				Serial.print("\nSetting up slave @ 0x"); Serial.print(HSd.i2cSlaveAddress[i], HEX);
 				Serial.println(":\n------------------------");
 			}
-			bool setupOk = slaveDrvSetup(i2cSwitchAddresses[i], reset, on, gain);
+			bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], reset, on, gain);
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);
-			slaveInitNotify(i2cSlaveAddresses[i], setupOk);
-			sendToSlave(i2cSlaveAddresses[i], NULL, 0);
+			slaveInitNotify(HSd.i2cSlaveAddress[i], setupOk);
+			sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
 		}
 	}
 }
@@ -113,7 +113,7 @@ void loop()
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
 
-			command.trim();
+			// command.trim();
 			strLength = command.length();
 			if(debug) {
 				Serial.print("Command: "); Serial.println(command);
@@ -126,42 +126,42 @@ void loop()
 
 			uint8_t HSpairs = strLength / 2;
 			for(uint8_t i = 0; i < HSpairs; i++) {
-				HScoord[i][0] = convertStrToInt(slicedCmd[2*i]);
-				HScoord[i][1] = convertStrToInt(slicedCmd[(2*i)+1]);
+				HSd.HScoord[i][0] = convertStrToInt(slicedCmd[2*i]);
+				HSd.HScoord[i][1] = convertStrToInt(slicedCmd[(2*i)+1]);
 				if(debug) {
-					Serial.print("HScoord: "); Serial.print(HScoord[i][0]);
-					Serial.print(" "); Serial.println(HScoord[i][1]);
+					Serial.print("HScoord: "); Serial.print(HSd.HScoord[i][0]);
+					Serial.print(" "); Serial.println(HSd.HScoord[i][1]);
 				}
 			}
 			
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// measure converting time
 
-			distributeCoordinates(HSpairs, HScoord, piezoMatrix);
+			distributeCoordinates(HSpairs, HSd.HScoord, HSd.HSpiezo);
 
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// measure distributing time
 
-			for(uint8_t i = 0; i < NUMBER_OF_SLAVES; i++) {
-				if(i2cSlaveAvailable[i]) {
-					if(HSf.piezoOffAll) {
+			for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
+				if(HSd.i2cSlaveAvailable[i]) {
+					if(HSd.piezoOffAll) {
 						if(debug) {
 							Serial.println("Sending all piezo off command to slave");
 						}
-						sendToSlave(i2cSlaveAddresses[i], NULL, 0);
-					} else if(HSf.piezoOff[i]) {
+						sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
+					} else if(HSd.piezoOff[i]) {
 						if(debug) {
 							Serial.println("Sending piezo off command to slave #"); Serial.print(i, DEC);
 						}
-						sendToSlave(i2cSlaveAddresses[i], NULL, 0);
-					} else if(piCnt[i] > 0) {
-						sendToSlave(i2cSlaveAddresses[i], piezoMatrix[i], piCnt[i]);
+						sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
+					} else if(HSd.piCnt[i] > 0) {
+						sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.piCnt[i]);
 					}
 				}
-				HSf.piezoOff[i] = false;
-				piCnt[i] = 0;
+				HSd.piezoOff[i] = false;
+				HSd.piCnt[i] = 0;
 			}
-			HSf.piezoOffAll = false;
+			HSd.piezoOffAll = false;
 
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// measure sending time
@@ -228,108 +228,380 @@ uint8_t convertStrToInt(String s)
 	return atoi(test);
 }
 
-// /* -------------------------------------------------------------------------- */
-// /* -------------------------------------------------------------------------- */
-// /* | parseCommand															| */
-// /* -------------------------------------------------------------------------- */
-// /* -------------------------------------------------------------------------- */
-// uint8_t parseCommand(String com)
-// {
-// 	if(debug) {
-// 		Serial.println("\nEntering parser...");
-// 		Serial.println("------------------");
-// 	}
-//
-// 	String subPart;		// substring used for trimming
-// 	uint8_t i, piezoPairs, coord, index;
-// 	bool cont;			// Flag to continue slicing the command string
-// 	bool startMarkerSet, byteOne, firstPair, lastPair;
-//
-// 	if(debug) {
-// 		Serial.print("Received: "); Serial.print(com);
-// 		Serial.print(" ...length: "); Serial.println(com.length());
-// 	}
-// 	if(com.length() != 0) {
-// 		cont = true;
-// 		byteOne = true;
-// 		com.concat(" "); // Work around to be able to terminate the parsing of the string
-// 		i = 0;
-// 		while(cont) {
-// 			subPart = com.substring(0, com.indexOf(" "));
-// 			subPart.trim();
-//
-// 			/* Byte marker logic:
-// 			* - if B1 (col) & start marker      -> first byte
-// 			* - if B1 (col) & NOT start marker  -> any B1 (col)
-// 			* - if B2 (raw) & stop marker       -> last byte
-// 			* - if B2 (raw) & NOT stop marker   -> any B2 (raw)
-// 			*/
-// 			coord = subPart.toInt();
-// 			if(debug) {
-// 				Serial.print("Coord: "); Serial.println(coord, DEC);
-// 			}
-// 			if(byteOne) {
-// 				if(coord & START_MARKER_MASK) {
-// 					firstPair = true;
-// 					lastPair = false;
-// 				} else {
-// 					firstPair = false;
-// 				}
-// 			} else {
-// 				if(coord & STOP_MARKER_MASK) {
-// 					lastPair = true;
-// 				} else {
-// 					lastPair = false;
-// 				}
-// 			}
-//
-// 			if(byteOne & firstPair) {
-// 				if(debug) {
-// 					Serial.print("B1 (col) & ST\t--> "); Serial.println(coord, DEC);
-// 				}
-// 				index = 0;
-// 				HScoord[index][0] = (coord & ~START_MARKER_MASK);
-// 				byteOne = false;
-// 			} else if(byteOne & !firstPair) {
-// 				if(debug) {
-// 					Serial.print("B1 (col)\t--> "); Serial.println(coord, DEC);
-// 				}
-// 				HScoord[index][0] = coord;
-// 				byteOne = false;
-// 			} else if(!byteOne & !lastPair) {
-// 				if(debug) {
-// 					Serial.print("B2 (raw)\t--> "); Serial.println(coord, DEC);
-// 				}
-// 				HScoord[index][1] = coord;
-// 				index += 1;
-// 				byteOne = true;
-// 			} else if(!byteOne & lastPair) {
-// 				if(debug) {
-// 					Serial.print("B2 (raw) & SP\t--> "); Serial.println(coord, DEC);
-// 				}
-// 				HScoord[index][1] = (coord & ~STOP_MARKER_MASK);
-// 				byteOne = true;
-// 				piezoPairs = index + 1;
-// 			} else {
-// 				if(debug) {
-// 					Serial.println("ERROR in pair matching!");
-// 				}
-// 				return -1;
-// 			}
-//
-// 			com.remove(0, com.indexOf(" ") + 1);
-// 			if(com.length() <= 0) cont = false;
-// 		}
-//
-// 		if(debug) {
-// 			Serial.print("\nCoordinates table ("); Serial.print(piezoPairs); Serial.println(" pairs):");
-// 			Serial.println("x\ty\n---------");
-// 			for(i = 0; i < piezoPairs; i++) {
-// 				Serial.print(HScoord[i][0], DEC);
-// 				Serial.print("\t"); Serial.println(HScoord[i][1], DEC);
-// 			}
-// 		}
-// 	}
-//
-// 	return piezoPairs; // returns the length of the parsed command line
-// }
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | slaveRegister															| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+void slaveRegister() {
+	uint8_t receivedAddr;
+	// bool reset = true;
+	// bool on = true;
+	// uint8_t gain = 3;
+  
+	if(debug) {
+		Serial.println("Registering slaves...");
+	}
+
+	// Registering...
+	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
+		Wire.requestFrom(HSd.i2cSlaveAddress[i], 1);
+    
+		while(Wire.available()) {
+			receivedAddr = Wire.read();
+			if(receivedAddr == HSd.i2cSlaveAddress[i]) {
+				HSd.i2cSlaveAvailable[i] = true;
+			} else {
+				HSd.i2cSlaveAvailable[i] = false;
+			}
+		}
+		
+		if(HSd.i2cSlaveAvailable[i] == true) {
+			slaveInitNotify(HSd.i2cSlaveAddress[i], false);
+		}
+		if(debug) {
+			Serial.print("Slave @ address 0x"); Serial.print(HSd.i2cSlaveAddress[i], HEX);
+			Serial.println((HSd.i2cSlaveAvailable[i]) ? " available" : " NOT available");
+		}
+	}
+	if(debug) {
+		Serial.println("");
+	}
+}
+
+
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | slaveDrvSetup															| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
+	int8_t retVal;
+	bool initOk = true;
+	
+	// initialization...
+	if(reset) {
+		if(debug) {
+			Serial.println("Resetting drv2667...");
+			Serial.print("- addressing i2c switch @ 0x"); Serial.println(addr, HEX);
+		}
+
+		// open each i2c switch channel and send reset command to the attached drv2667
+		for(uint8_t i = 0; i < HS_DPS; i++) {
+			// open switch
+			Wire.beginTransmission(addr);		
+			Wire.write((uint8_t)(1 << i));
+			retVal = Wire.endTransmission();
+			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
+			if(debug) {
+				Serial.print("- opening switch #"); Serial.print(i, DEC);
+				if(retVal == 0) {
+					Serial.println("\t\t\tsuccess!");
+				} else {
+					Serial.println("\t\t\tERROR!");
+				}
+			}
+			
+			// reset driver
+			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
+			Wire.write(DRV2667_REG02);
+			Wire.write(DEV_RST);
+			retVal = Wire.endTransmission();
+			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
+			if(debug) {
+				Serial.print("- resetting device");
+				if(retVal == 0) {
+					Serial.println("\t\t\tsuccess!");
+				} else {
+					Serial.println("\t\t\tERROR!");
+				}
+			}
+		}
+		
+		// close switch
+		Wire.beginTransmission(addr);
+		Wire.write(0);
+		retVal = Wire.endTransmission();
+		initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
+		if(debug) {
+			Serial.print("- closing i2c swtich");
+			if(retVal == 0) {
+				Serial.println("\t\t\tsuccess!\n");
+			} else {
+				Serial.println("\t\t\tERROR!\n");
+			}
+		}
+	}
+  
+	// switch on...
+	if(on) {
+		if(debug) {
+			Serial.println("Starting up drv2667...");
+			Serial.print("- addressing i2c switch @ 0x"); Serial.println(addr, HEX);
+		}
+
+		// open each i2c switch channel and send settings to the attached drv2667
+		for(uint8_t i = 0; i < HS_DPS; i++) {
+			// open switch
+			Wire.beginTransmission(addr);
+			Wire.write((uint8_t)(1 << i));
+			retVal = Wire.endTransmission();
+			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
+			if(debug) {
+				Serial.print("- opening switch #"); Serial.print(i, DEC);
+				if(retVal == 0) {
+					Serial.println("\t\t\tsuccess!");					
+				} else {
+					Serial.println("\t\t\tERROR!");					
+				}
+			}
+			
+			// wake up
+			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
+			Wire.write(DRV2667_REG02);
+			Wire.write(GO);
+			retVal = Wire.endTransmission();
+			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
+			if(debug) {
+				Serial.print("- waking up");
+				if(retVal == 0) {
+					Serial.println("\t\t\t\tsuccess!");
+				} else {
+					Serial.println("\t\t\t\tERROR!");
+				}
+			}
+
+			// set mux & gain
+			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
+			Wire.write(DRV2667_REG01);
+			Wire.write(INPUT_MUX | gain);
+			retVal = Wire.endTransmission();
+			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
+			if(debug) {
+				Serial.print("- setting MUX and GAIN to 0x:"); Serial.print((INPUT_MUX | gain), HEX);
+				if(retVal == 0) {
+					Serial.println("\tsuccess!");
+				} else {
+					Serial.println("\tERROR!");
+				}
+			}
+			
+			// enable amplifier
+			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
+			Wire.write(DRV2667_REG02);
+			Wire.write(EN_OVERRIDE);
+			retVal = Wire.endTransmission();
+			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
+			if(debug) {
+				Serial.print("- enabling amplifier");
+				if(retVal == 0) {
+					Serial.println("\t\t\tsuccess!");
+				} else {
+					Serial.println("\t\t\tERROR!");
+				}
+			}				
+		}
+		
+		// close i2c switch
+		Wire.beginTransmission(addr);
+		Wire.write(0);
+		retVal = Wire.endTransmission();
+		initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
+		if(debug) {
+			Serial.print("- closing i2c swtich");
+			if(retVal == 0) {
+				Serial.println("\t\t\tsuccess!");
+			} else {
+				Serial.println("\t\t\tERROR!");
+			}
+		}
+		
+		
+	} else { // switch off...
+		if(debug) {
+			Serial.println("Switching off drv2667...");
+			Serial.print("- addressing i2c switch @ 0x"); Serial.println(addr, HEX);
+		}
+		
+		// open each i2c switch channel and send standby command to the attached drv2667
+		for(uint8_t i = 0; i < HS_DPS; i++) {
+			Wire.beginTransmission(addr);
+			Wire.write((uint8_t)(1 << i));
+			retVal = Wire.endTransmission();
+			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
+			if(debug) {
+				Serial.print("- opening switch #"); Serial.print(i, DEC);
+				if(retVal == 0) {
+					Serial.println("\t\t\tsuccess!");					
+				} else {
+					Serial.println("\t\t\tERROR!");					
+				}
+			}
+      
+			Wire.beginTransmission(DRV2667_I2C_ADDRESS);
+			Wire.write(DRV2667_REG02);
+			Wire.write(STANDBY);
+			retVal = Wire.endTransmission();
+			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
+			if(debug) {
+				Serial.println("- standing by");
+				if(retVal == 0) {
+					Serial.println("\t\t\tsuccess!");					
+				} else {
+					Serial.println("\t\t\tERROR!");					
+				}
+			}
+		}
+		
+		// close i2c switch
+		Wire.beginTransmission(addr);
+		Wire.write(0);
+		retVal = Wire.endTransmission();
+		initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
+		if(debug) {
+			Serial.print("- closing i2c swtich");
+			if(retVal == 0) {
+				Serial.println("\t\t\tsuccess!");
+			} else {
+				Serial.println("\t\t\tERROR!");
+			}
+		}
+	}
+	
+	return initOk;
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | slaveInitNotify														| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+void slaveInitNotify(int8_t addr, bool notification)
+{
+	Wire.beginTransmission(addr);
+	Wire.write(i2cCmd_notify);
+	Wire.write((notification) ? 1 : 0);
+	Wire.endTransmission();
+	if(debug) {
+		Serial.print("Sending init notification to slave 0x"); Serial.println(addr, HEX);
+		Serial.print("- value: "); Serial.println((notification) ? "true" : "false");
+	}
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | distributeCoordinates													| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX]) {
+								
+	uint8_t mod, sn, pi;		// index modulo, slave number, piezo index
+
+	if(debug) {
+		Serial.print("\nDistributing coordinates... length: "); Serial.println(len);
+	}
+	
+	for(uint8_t i = 0; i < len; i++) {
+		// check column value of a pair and assign it to the corresponding slave
+		if(orig[i][0] < HS_CPS) {
+			mod = 0;
+			sn = 0;
+		} else if(orig[i][0] < (2 * HS_CPS)) {
+			mod = HS_CPS;
+			sn = 1;
+		} else if(orig[i][0] < (3 * HS_CPS)) {
+			mod = 2 * HS_CPS;
+			sn = 2;
+		} else if(orig[i][0] < (4 * HS_CPS)) {
+			mod = 3 * HS_CPS;
+			sn = 3;
+		} else if(orig[i][0] == SERIAL_CMD_MODE) {
+			if(debug) {
+				Serial.print("Entering command mode: 0x"); Serial.println(orig[i][1], HEX);
+			}
+			switch(orig[i][1]) {
+				case sCmd_piezoOffAll:
+					HSd.piezoOffAll = true;
+					break;
+				case sCmd_piezoOffS1:
+					HSd.piezoOff[0] = true;
+					break;
+				case sCmd_piezoOffS2:
+					HSd.piezoOff[1] = true;
+					break;
+				case sCmd_piezoOffS3:
+					HSd.piezoOff[2] = true;
+					break;
+				case sCmd_piezoOffS4:
+					HSd.piezoOff[3] = true;
+					break;
+				case sCmd_drvOffAll:
+					HSd.drvOffAll = true;
+					break;
+				case sCmd_drvOn:
+					HSd.drvOn = true;
+					break;
+				case sCmd_drvOff:
+					HSd.drvOff = true;
+					break;
+				default:
+					break;
+			}
+		}
+		if(debug) {
+			Serial.print("sn: "); Serial.print(sn, DEC);
+			Serial.print(" ...available? "); Serial.println((HSd.i2cSlaveAvailable[sn]) ? "yes" : "no");
+			
+		}
+		// work only for available devices
+		if(HSd.i2cSlaveAvailable[sn]) {
+			// calculate the linear position (piezo index) of the pair
+			// and save it as next item of the selected slave of 'HSpiezo'.
+			// !! always multiply by 9!! Not connected piezo will be skipped.
+			pi = ((orig[i][0] - mod) * 9) + (orig[i][1] * 2);
+			HSd.HSpiezo[sn][HSd.piCnt[sn]] = pi;
+			HSd.piCnt[sn] += 1;	// increment the pi counter of the selected slave
+		
+			if(debug) {
+				uint8_t pi5 = ((orig[i][0] - mod) * 5) + orig[i][1];
+				Serial.print("Slave#: "); Serial.print(sn);
+				Serial.print(" Piezo#: "); Serial.print(pi);
+				Serial.print("("); Serial.print(pi5); Serial.println(")");
+      
+				Serial.print("HSpiezo: "); Serial.print(HSd.HSpiezo[sn][HSd.piCnt[sn]-1], DEC);
+				Serial.print(" / piCnt: "); Serial.println(HSd.piCnt[sn]-1);
+			}
+		}
+	}
+}
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | sendToSlave															| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+void sendToSlave(uint8_t sn, uint8_t *mes, uint8_t len) {
+	if(debug) {
+		Serial.print("\nWriting to 0x");
+		Serial.print(sn, HEX);
+		Serial.print(": ");
+	}
+  
+	Wire.beginTransmission(sn);		// address slave @ address sn
+	Wire.write(i2cCmd_regSet);		// command byte with register set message
+	for(uint8_t i = 0; i < len; i++) {
+		if(debug) {
+			Serial.print(mes[i], DEC); Serial.print("(0x");
+			Serial.print(mes[i], HEX); Serial.print(")");
+			if(i < (len-1)) Serial.print(" - ");
+		}
+		Wire.write(mes[i]);				// send all indexes associated to this slave
+	}
+	if(debug) {
+		Serial.println("");
+	}
+	Wire.endTransmission();
+}
+

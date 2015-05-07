@@ -298,3 +298,56 @@ void receiveEvent(int howmany)
 			break;
 	}
 }
+
+
+
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | piezoSend																| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+void piezoSend(uint32_t val1, uint32_t val2, uint32_t val3) {
+	digitalWrite(LED3_PIN, LOW);		// notify SPI activity
+	digitalWrite(LOAD_PIN, LOW);		// prepare LOAD pin
+	digitalWrite(CLR_PIN, LOW);			// reset all shift registers
+	digitalWrite(CLR_PIN, HIGH);		// ...
+	
+	SPI.beginTransaction(settingsA);	// start the SPI transaction with saved settings
+	SPI.transfer((uint8_t)(val3));
+	SPI.transfer((uint8_t)(val2 >> 24));
+	SPI.transfer((uint8_t)(val2 >> 16));
+	SPI.transfer((uint8_t)(val2 >> 8));
+	SPI.transfer((uint8_t)(val2));
+	SPI.transfer((uint8_t)(val1 >> 24));
+	SPI.transfer((uint8_t)(val1 >> 16));
+	SPI.transfer((uint8_t)(val1 >> 8));
+	SPI.transfer((uint8_t)(val1));
+	SPI.endTransaction();
+	
+	if(debug) {
+		Serial.print("Sending to shift registers:\nb'");
+		Serial.print((uint8_t)(val3), BIN); Serial.print(" ");
+		Serial.print((uint8_t)(val2 >> 24), BIN); Serial.print(" ");
+		Serial.print((uint8_t)(val2 >> 16), BIN); Serial.print(" ");
+		Serial.print((uint8_t)(val2 >> 8), BIN); Serial.print(" ");
+		Serial.print((uint8_t)(val2), BIN); Serial.print(" ");
+		Serial.print((uint8_t)(val1 >> 24), BIN); Serial.print(" ");
+		Serial.print((uint8_t)(val1 >> 16), BIN); Serial.print(" ");
+		Serial.print((uint8_t)(val1 >> 8), BIN); Serial.print(" ");
+		Serial.print((uint8_t)(val1), BIN); Serial.println("'");
+		
+		Serial.print("0x   "); Serial.print((uint8_t)val3, HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val2 >> 24), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val2 >> 16), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val2 >> 8), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val2), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val1 >> 24), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val1 >> 16), HEX);
+		Serial.print("       "); Serial.print((uint8_t)(val1 >> 8), HEX);
+		Serial.print("       "); Serial.println((uint8_t)(val1), HEX);
+	}
+	
+	digitalWrite(LOAD_PIN, HIGH);		// generate rising edge on LOAD pin
+	digitalWrite(LED3_PIN, HIGH);		// stop SPI activity notification
+}

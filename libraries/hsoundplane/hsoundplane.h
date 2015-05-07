@@ -36,11 +36,10 @@
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 // HSoundplane characteristics
-#define NUMBER_OF_SLAVES	4			// number of slaves to drive (1 - 4)
-#define COLUMNS_PER_SLAVE	8			// number of columns per slave (usually 8)
-
-#define MAX_COORD_PAIRS		16			// maximal amount of simultaneous coordinate pairs
-#define DRV_PER_SLAVE		8			// number of drv2667 per slave
+#define HS_SLAVE_NUMBER	4			// number of slaves to drive (1 - 4)
+#define HS_COORD_MAX	16			// maximal amount of simultaneous coordinate pairs
+#define HS_CPS			8			// number of columns per slave (usually 8)
+#define HS_DPS			8			// number of drv2667 per slave (usually 8)
 
 // I2C addresses
 #define I2C_MASTER_ADDRESS	0x40		// i2c master address
@@ -53,33 +52,8 @@
 #define I2C_SWITCH_ADDR3	0x72		// i2c switch3 address
 #define I2C_SWITCH_ADDR4	0x73		// i2c switch4 address
 
-// I2C command headers
-// -------------------
-// Commands from master to slave with first byte (below) defining command type
-enum i2cCommand {
-	i2cCmd_regSet,
-	i2cCmd_notify
-};
-
-// Serial commands
-// ---------------
-// Commands from computer to master sent like a coordinate pair: 0xFF - CMD
-// If CMD needs more arguments (noted CMD*), the following pair contains the values
+// Serial value to enter serial command mode
 #define SERIAL_CMD_MODE		0xFF		// serial command start byte
-enum serialCommand {
-	// switch off piezos (i.e. close shift registers)
-	sCmd_piezoOffAll,					// all
-	sCmd_piezoOffS1,					// slave #1
-	sCmd_piezoOffS2,					// slave #2
-	sCmd_piezoOffS3,					// slave #3
-	sCmd_piezoOffS4,					// slave #4
-	
-	// switch on/off drivers drv2667
-	sCmd_drvOffAll,						// all off
-	sCmd_drvOn,							// driver on * (slave# - gain)
-	sCmd_drvOff,						// driver off * (slave# - ...)
-};
-
 
 // Pinout of the arduino nano on the driver board
 #define LED1_PIN			3			// LED1 -> device started up
@@ -102,6 +76,38 @@ enum serialCommand {
 #define LED_ON				LOW			// macro to set if LEDs are switched on HIGH or LOW
 #define LED_OFF				HIGH		// and never forget it after that
 
+
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* | ENUM																	| */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+// I2C command headers
+// -------------------
+// Commands from master to slave with first byte (below) defining command type
+enum i2cCommand {
+	i2cCmd_regSet,
+	i2cCmd_notify
+};
+
+// Serial commands
+// ---------------
+// Commands from computer to master sent like a coordinate pair: 0xFF - CMD
+// If CMD needs more arguments (noted CMD*), the following pair contains the values
+enum serialCommand {
+	// switch off piezos (i.e. close shift registers)
+	sCmd_piezoOffAll,					// all
+	sCmd_piezoOffS1,					// slave #1
+	sCmd_piezoOffS2,					// slave #2
+	sCmd_piezoOffS3,					// slave #3
+	sCmd_piezoOffS4,					// slave #4
+	
+	// switch on/off drivers drv2667
+	sCmd_drvOffAll,						// all off
+	sCmd_drvOn,							// driver on * (slave# - gain)
+	sCmd_drvOff,						// driver off * (slave# - ...)
+};
+
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 /* | VARIABLES																| */
@@ -123,27 +129,36 @@ const uint32_t piezoArray2[32] = {
 const uint32_t piezoArray3[8] = {
 	0xFFFFFFFE, 0xFFFFFFFD, 0xFFFFFFFB, 0xFFFFFFF7, 0xFFFFFFEF, 0xFFFFFFDF, 0xFFFFFFBF, 0xFFFFFF7F};			// row 8 (8/9)
 
-typedef struct HSflags{
-	bool piezoOff[NUMBER_OF_SLAVES];
+typedef struct HSdata {
+	// flags...
+	bool piezoOff[HS_SLAVE_NUMBER];
 	bool piezoOffAll;
 	bool drvOffAll;
 	bool drvOff;
 	bool drvOn;
+	bool i2cSlaveAvailable[HS_SLAVE_NUMBER];
+	// data arrays...
+	uint8_t HScoord[HS_COORD_MAX][2];				// input HS coordinates send from computer to master
+	uint8_t HSpiezo[HS_SLAVE_NUMBER][HS_COORD_MAX];	// output HS piezo indexes for each slave
+	uint8_t piCnt[HS_SLAVE_NUMBER];					// piezo index counter for each slave
+	// i2c addresses...
+	int8_t i2cSlaveAddress[HS_SLAVE_NUMBER] = {					// slave addresses array
+		I2C_SLAVE_ADDR1,
+		I2C_SLAVE_ADDR2,
+		I2C_SLAVE_ADDR3,
+		I2C_SLAVE_ADDR4
+	};
+	int8_t i2cSwitchAddress[HS_SLAVE_NUMBER] = {					// i2c switch addresses array
+		I2C_SWITCH_ADDR1,
+		I2C_SWITCH_ADDR2,
+		I2C_SWITCH_ADDR3,
+		I2C_SWITCH_ADDR4
+	};
 };
 
 // extern...
 extern bool debug;
 extern SPISettings settingsA;
-extern uint8_t HScoord[MAX_COORD_PAIRS][2];
-extern uint8_t piezoMatrix[NUMBER_OF_SLAVES][MAX_COORD_PAIRS];
-extern uint8_t piCnt[NUMBER_OF_SLAVES];
-extern int8_t i2cSlaveAddresses[NUMBER_OF_SLAVES];
-extern int8_t i2cSwitchAddresses[NUMBER_OF_SLAVES];
-extern bool i2cSlaveAvailable[NUMBER_OF_SLAVES];
-extern struct HSflags HSf;
-// extern bool piezoOff[5];
-// extern bool driverOff[5];
-
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -155,7 +170,7 @@ extern struct HSflags HSf;
 void slaveRegister();
 bool slaveDrvSetup(int8_t, bool, bool, uint8_t);
 void slaveInitNotify(int8_t, bool);
-void distributeCoordinates(uint8_t len, uint8_t orig[MAX_COORD_PAIRS][2], uint8_t dest[NUMBER_OF_SLAVES][MAX_COORD_PAIRS]);
+void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX]);
 void sendToSlave(uint8_t slaveNumber, uint8_t *message, uint8_t len);
 
 // slave functions

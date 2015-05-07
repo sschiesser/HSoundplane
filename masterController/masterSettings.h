@@ -35,7 +35,7 @@
 /* -------------------------------------------------------------------------- */
 #define I2C_FAST_MODE		1			// 0 -> standad mode (100 kHz) i2c,
 										// 1 -> fast mode (400 kHz)
-#define SERIAL_SPEED		230400		// serial communication speed for
+#define SERIAL_SPEED		38400		// serial communication speed for
 										// 1. host command reception (CDC or rawHID)
 										// 2. debugging
 #define START_MARKER_MASK	0xE0		// bit mask to recognize serial start byte (ST)
@@ -62,36 +62,11 @@ bool debug = true;						// DEBUG FLAG!!
   
 bool syncPinState;
 
-struct HSflags HSf;
-// bool piezoOff[5];
-// bool driverOff[5];
-
 String command;							// serial command to parse
-String slicedCmd[2 * MAX_COORD_PAIRS];	// command line sliced into integers
+String slicedCmd[2 * HS_COORD_MAX];		// command line sliced into integers
 
-uint8_t HScoord[MAX_COORD_PAIRS][2];	// HSoundplane coordinate pairs fetched
-										// from the serial command parsing
-
-uint8_t piezoMatrix[NUMBER_OF_SLAVES][MAX_COORD_PAIRS];	// for each slave,
-														// indexes of the piezos to address
-
-uint8_t piCnt[NUMBER_OF_SLAVES];		// for each slave, piezo index counter
-
-int8_t i2cSlaveAddresses[] = {			// slave addresses array
-	I2C_SLAVE_ADDR1,
-	I2C_SLAVE_ADDR2,
-	I2C_SLAVE_ADDR3,
-	I2C_SLAVE_ADDR4
-};
-
-int8_t i2cSwitchAddresses[] = {			// i2c switch addresses array
-	I2C_SWITCH_ADDR1,
-	I2C_SWITCH_ADDR2,
-	I2C_SWITCH_ADDR3,
-	I2C_SWITCH_ADDR4
-};
-
-bool i2cSlaveAvailable[NUMBER_OF_SLAVES];	// available slaves array
+// extern...
+extern struct HSdata HSd;
 
 
 /* -------------------------------------------------------------------------- */
