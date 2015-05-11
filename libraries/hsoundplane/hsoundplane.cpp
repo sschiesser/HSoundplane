@@ -39,7 +39,9 @@ void HSInit(void) {
 		HSd.drvOn[i] = false;
 		HSd.drvOff[i] = false;
 	}
-	HSd.coordError = false;
+	HSd.commandMode = false;
+	HSd.colError = false;
+	HSd.rawError = false;
 }
 
 // ********************

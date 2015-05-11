@@ -40,6 +40,8 @@
 #define HS_COORD_MAX	16			// maximal amount of simultaneous coordinate pairs
 #define HS_CPS			8			// number of columns per slave (usually 8)
 #define HS_DPS			8			// number of drv2667 per slave (usually 8)
+#define HS_PIEZO_MAX	72			// absolute maximum available piezos on a slave
+#define HS_COL9_MODE	0
 
 // I2C addresses
 #define I2C_MASTER_ADDRESS	0x40		// i2c master address
@@ -136,20 +138,31 @@ const uint32_t piezoArray2[32] = {
 const uint32_t piezoArray3[8] = {
 	0xFFFFFFFE, 0xFFFFFFFD, 0xFFFFFFFB, 0xFFFFFFF7, 0xFFFFFFEF, 0xFFFFFFDF, 0xFFFFFFBF, 0xFFFFFF7F};			// row 8 (8/9)
 
+
 typedef struct HSdata {
-	// flags...
+	// col9 flag...
+#if(HS_COL9_MODE > 0)
+	bool col9 = true;
+#else
+	bool col9 = false;
+#endif
+	
+	// command mode flags...
+	bool commandMode;								// general command mode flag
 	bool piezoOffAll[HS_SLAVE_NUMBER];				// piezos OFF (all) command for each slave
 	bool drvOnAll[HS_SLAVE_NUMBER];					// driver ON (all) command for each slave
 	bool drvOffAll[HS_SLAVE_NUMBER];				// drivers OFF (all) command for each slave
-	bool drvOff[HS_SLAVE_NUMBER];					// driver OFF command for each slave WITH DRV BITMASK @ NEXT BYTE
 	bool drvOn[HS_SLAVE_NUMBER];					// driver ON command for each slave WITH DRV BITMASK @ NEXT BYTE
-	bool i2cSlaveAvailable[HS_SLAVE_NUMBER];		// slave availability flags
-	bool coordError;
+	bool drvOff[HS_SLAVE_NUMBER];					// driver OFF command for each slave WITH DRV BITMASK @ NEXT BYTE
+	bool colError;
+	bool rawError;
+	
 	// data arrays...
 	uint8_t HScoord[HS_COORD_MAX][2];				// input HS coordinates send from computer to master
 	uint8_t HSpiezo[HS_SLAVE_NUMBER][HS_COORD_MAX];	// output HS piezo indexes for each slave
 	uint8_t piCnt[HS_SLAVE_NUMBER];					// piezo index counter for each slave
-	// i2c addresses...
+
+	// i2c variables...
 	int8_t i2cSlaveAddress[HS_SLAVE_NUMBER] = {		// slave i2c addresses array
 		I2C_SLAVE_ADDR1,
 		I2C_SLAVE_ADDR2,
@@ -162,7 +175,9 @@ typedef struct HSdata {
 		I2C_SWITCH_ADDR3,
 		I2C_SWITCH_ADDR4
 	};
+	bool i2cSlaveAvailable[HS_SLAVE_NUMBER];		// slave availability flags
 };
+
 
 // extern...
 extern bool debug;
@@ -174,17 +189,5 @@ extern SPISettings settingsA;
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 void HSInit(void);
-// master functions
-// void slaveInit(bool, bool, uint8_t);
-// void slaveRegister();
-// bool slaveDrvSetup(int8_t, bool, bool, uint8_t);
-// void slaveInitNotify(int8_t, bool);
-// void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX]);
-// void sendToSlave(uint8_t slaveNumber, uint8_t *message, uint8_t len);
-//
-// // slave functions
-// void driverSetup(bool, bool on, uint8_t gain);
-// void piezoSend(uint32_t val1, uint32_t val2, uint32_t val3);
-
 
 #endif

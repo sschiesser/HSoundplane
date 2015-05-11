@@ -70,6 +70,7 @@ void setup()
 		Serial.print("serial:\n\t- port @ "); Serial.println(SERIAL_SPEED, DEC);
 		Serial.print("i2c:\n\t- port @ "); Serial.println((i2cFastMode) ? "400 kHz" : "100 kHz");
 		Serial.print("slaves:\n\t- quantity: "); Serial.println(HS_SLAVE_NUMBER, DEC);
+		Serial.print("piezos:\n\t- items/column: "); Serial.println((HSd.col9) ? "9" : "5");
 		Serial.println("**************************************\n");
 	}
 
@@ -508,6 +509,7 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 	uint8_t mod = 0;					// index modulo
 	uint8_t sn = 0;						// slave number
 	uint8_t pi = 0;						// piezo index
+	uint8_t col = 0;
 
 	if(debug) {
 		Serial.print("\nDistributing coordinates... length: "); Serial.println(len);
@@ -532,6 +534,7 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 			if(debug) {
 				Serial.print("\nEntering command mode: ");
 			}
+			HSd.commandMode = true;
 			switch(orig[i][1]) {
 				case sCmd_piezoOffAll:
 					if(debug) Serial.println("piezoOffAll");
@@ -607,35 +610,52 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 			}
 		} else {
 			if(debug) {
-				Serial.println("Column value not valid!");
+				Serial.println("\nColumn value not valid! No slave...");
 			}
-			HSd.coordError = true;
+			HSd.colError = true;
 		}
-		if(debug) {
-			Serial.print("\nsn: "); Serial.print(sn, DEC);
-			Serial.print(" ...available? "); Serial.println((HSd.i2cSlaveAvailable[sn]) ? "yes" : "no");
-			
-		}
-		// work only for available devices AND available coordinates
-		if(HSd.i2cSlaveAvailable[sn] && !HSd.coordError) {
-			// calculate the linear position (piezo index) of the pair
-			// and save it as next item of the selected slave of 'HSpiezo'.
-			// !! always multiply by 9!! Not connected piezo will be skipped.
-			pi = ((orig[i][0] - mod) * 9) + (orig[i][1] * 2);
-			HSd.HSpiezo[sn][HSd.piCnt[sn]] = pi;
-			HSd.piCnt[sn] += 1;	// increment the pi counter of the selected slave
-		
+		if(!HSd.commandMode && !HSd.colError) {
 			if(debug) {
-				uint8_t pi5 = ((orig[i][0] - mod) * 5) + orig[i][1];
-				Serial.print("Slave#: "); Serial.print(sn);
-				Serial.print(" Piezo#: "); Serial.print(pi);
-				Serial.print("("); Serial.print(pi5); Serial.println(")");
+				Serial.print("\nWorking on slave #"); Serial.print(sn, DEC); Serial.println("...");
+				Serial.print("- col value = "); Serial.println((orig[i][0] - mod), DEC);
+				Serial.print("- raw value = "); Serial.println(orig[i][1], DEC);
+				Serial.print("- available? "); Serial.println((HSd.i2cSlaveAvailable[sn]) ? "yes" : "no");
+			}
+			// work only for available devices AND available coordinates
+			if(HSd.i2cSlaveAvailable[sn]) {
+				if(HSd.col9 && (orig[i][1] > 8)) {
+					HSd.rawError = true;
+				}
+				else if(!HSd.col9 && (orig[i][1] > 4)) {
+					HSd.rawError = true;
+				}
+				if(debug && HSd.rawError) {
+					Serial.print("Raw value not valid (> "); Serial.print((HSd.col9) ? "8" : "4");
+					Serial.println(")!");
+				}
+				if(!HSd.rawError) {
+					// calculate the linear position (piezo index) of the pair
+					// and save it as next item of the selected slave of 'HSpiezo'.
+					// !! always multiply by 9!! Not connected piezo will be skipped.
+					pi = ((orig[i][0] - mod) * 9) + (orig[i][1] * 2);
+					HSd.HSpiezo[sn][HSd.piCnt[sn]] = pi;
+					HSd.piCnt[sn] += 1;	// increment the pi counter of the selected slave
+		
+					if(debug) {
+						uint8_t pi5 = ((orig[i][0] - mod) * 5) + orig[i][1];
+						// Serial.print("Slave#: "); Serial.print(sn);
+						Serial.print("- piezo#: "); Serial.print(pi, DEC);
+						Serial.print("("); Serial.print(pi5, DEC); Serial.println(")");
       
-				Serial.print("HSpiezo: "); Serial.print(HSd.HSpiezo[sn][HSd.piCnt[sn]-1], DEC);
-				Serial.print(" / piCnt: "); Serial.println(HSd.piCnt[sn]-1);
+						Serial.print("- HSpiezo: "); Serial.print(HSd.HSpiezo[sn][HSd.piCnt[sn]-1], DEC);
+						Serial.print(" / piCnt: "); Serial.println((HSd.piCnt[sn]-1), DEC);
+					}
+				}
 			}
 		}
-		HSd.coordError = false;
+		HSd.commandMode = false;
+		HSd.colError = false;
+		HSd.rawError = false;
 	}
 }
 
