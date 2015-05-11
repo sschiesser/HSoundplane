@@ -28,7 +28,7 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <String.h>
-#include "HSoundplane.h"
+#include "hsoundplane.h"
 #include "masterSettings.h"
 
 String command;							// serial command to parse
@@ -52,11 +52,12 @@ void setup()
 	
 	delay(STARTUP_WAIT_MS);
 	
-	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
-		HSd.piezoOff[i] = false;
-	}
-	HSd.piezoOffAll = false;
-	HSd.drvOffAll = false;
+	HSInit();
+	// for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
+	// 	HSd.piezoOffAll[i] = false;
+	// }
+	// HSd.piezoOffAll = false;
+	// HSd.drvOffAll = false;
 
 	// Setting up communication...
 	Serial.begin(SERIAL_SPEED);
@@ -111,18 +112,19 @@ void loop()
     
 		if(c == '[') {
 			command = "";
-			if(debug) {
-				Serial.println("'[' found, starting receiving");
-			}
+			// if(debug) {
+			// 	Serial.println("'[' found, starting receiving");
+			// }
 		} else if(c == ']') {
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
 
-			// command.trim();
+			command.trim();
 			uint8_t strLength = command.length();
 			if(debug) {
-				Serial.print("\n****************************************\nNew command: "); Serial.print(command);
+				Serial.print("\n\n****************************************\nNew command: "); Serial.print(command);
 				Serial.print(" (length: "); Serial.print(strLength); Serial.println(")");
+				Serial.print("****************************************\n");
 			}
 			strLength = sliceCommand(command);
 
@@ -149,33 +151,30 @@ void loop()
 
 			for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
 				if(HSd.i2cSlaveAvailable[i]) {
-					if(HSd.piezoOffAll) {
+					if(HSd.piezoOffAll[i]) {
 						if(debug) {
-							Serial.println("Sending all piezo off command to slave");
-						}
-						sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
-					} else if(HSd.piezoOff[i]) {
-						if(debug) {
-							Serial.println("Sending piezo off command to slave #"); Serial.print(i, DEC);
+							Serial.print("\nSending piezo off command to slave #"); Serial.println(i, DEC);
 						}
 						sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
 					} else if(HSd.piCnt[i] > 0) {
+						if(debug) {
+							Serial.print("\nSending piezo settings to slave #"); Serial.println(i, DEC);
+						}
 						sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.piCnt[i]);
 					}
 				}
-				HSd.piezoOff[i] = false;
+				HSd.piezoOffAll[i] = false;
 				HSd.piCnt[i] = 0;
 			}
-			HSd.piezoOffAll = false;
 
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// measure sending time
 
 		} else {
 			command += c;
-			if(debug) {
-				Serial.print(c); Serial.print(" - "); Serial.println(command);
-			}
+			// if(debug) {
+			// 	Serial.print(c); Serial.print(" - "); Serial.println(command);
+			// }
 		}
 	}
 }
@@ -190,7 +189,7 @@ uint8_t sliceCommand(String s)
 {
 	if(debug) {
 		Serial.println("\nSlicing command line into ints...");
-		Serial.println("---------------------------------");
+		Serial.println("----------------------------------------");
 		Serial.print("Received command length: "); Serial.println(s.length(), DEC);
 	}
 	
@@ -199,26 +198,29 @@ uint8_t sliceCommand(String s)
 	
 	for(uint8_t i = 0; i < s.length(); i++) {
 		if(debug) {
-			Serial.print("char: "); Serial.println(s[i], DEC);
+			Serial.print("char: "); Serial.print(s[i], DEC);
 		}
 		if(s[i] == ' ') {
 			slicedCmd[sliceInc++] = temp;
 			temp = "";
 			if(debug) {
-				Serial.println("Separator...");
+				Serial.println(" - separator...");
 			}
 		} else {
+			if(debug) {
+				Serial.println("");
+			}
 			temp += s[i];
 		}
 	}
 	slicedCmd[sliceInc++] = temp;
 	
 	if(debug) {
-		Serial.print("Sliced command line (length: "); Serial.print(sliceInc); Serial.println(")");
+		Serial.print("\nSliced command line (length: "); Serial.print(sliceInc); Serial.println(")");
 		for(uint8_t i = 0; i < (sliceInc); i++) {
 			Serial.print(slicedCmd[i]); Serial.print(" ");
 		}
-		Serial.println("");
+		Serial.println("\n");
 	}
 	
 	return sliceInc;
@@ -244,9 +246,6 @@ uint8_t convertStrToInt(String s)
 /* -------------------------------------------------------------------------- */
 void slaveRegister() {
 	uint8_t receivedAddr;
-	// bool reset = true;
-	// bool on = true;
-	// uint8_t gain = 3;
   
 	if(debug) {
 		Serial.println("Registering slaves...");
@@ -506,11 +505,14 @@ void slaveInitNotify(int8_t addr, bool notification)
 /* -------------------------------------------------------------------------- */
 void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX]) {
 								
-	uint8_t mod, sn, pi;		// index modulo, slave number, piezo index
+	uint8_t mod = 0;					// index modulo
+	uint8_t sn = 0;						// slave number
+	uint8_t pi = 0;						// piezo index
 
 	if(debug) {
 		Serial.print("\nDistributing coordinates... length: "); Serial.println(len);
-	}
+		Serial.println("----------------------------------------");
+			}
 	
 	for(uint8_t i = 0; i < len; i++) {
 		// check column value of a pair and assign it to the corresponding slave
@@ -528,44 +530,94 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 			sn = 3;
 		} else if(orig[i][0] == SERIAL_CMD_MODE) {
 			if(debug) {
-				Serial.print("Entering command mode: 0x"); Serial.println(orig[i][1], HEX);
+				Serial.print("\nEntering command mode: ");
 			}
 			switch(orig[i][1]) {
 				case sCmd_piezoOffAll:
-					HSd.piezoOffAll = true;
+					if(debug) Serial.println("piezoOffAll");
+					HSd.piezoOffAll[0] = true;
+					HSd.piezoOffAll[1] = true;
+					HSd.piezoOffAll[2] = true;
+					HSd.piezoOffAll[3] = true;
 					break;
 				case sCmd_piezoOffS1:
-					HSd.piezoOff[0] = true;
+					if(debug) Serial.println("piezoOffS1");
+					HSd.piezoOffAll[0] = true;
 					break;
 				case sCmd_piezoOffS2:
-					HSd.piezoOff[1] = true;
+					if(debug) Serial.println("piezoOffS2");
+					HSd.piezoOffAll[1] = true;
 					break;
 				case sCmd_piezoOffS3:
-					HSd.piezoOff[2] = true;
+					if(debug) Serial.println("piezoOffS3");
+					HSd.piezoOffAll[2] = true;
 					break;
 				case sCmd_piezoOffS4:
-					HSd.piezoOff[3] = true;
+					if(debug) Serial.println("piezoOffS4");
+					HSd.piezoOffAll[3] = true;
+					break;
+				case sCmd_drvOnAll:
+					if(debug) Serial.println("drvOnAll");
+					HSd.drvOnAll[0] = true;
+					HSd.drvOnAll[1] = true;
+					HSd.drvOnAll[2] = true;
+					HSd.drvOnAll[3] = true;
 					break;
 				case sCmd_drvOffAll:
-					HSd.drvOffAll = true;
+					if(debug) Serial.println("drvOffAll");
+					HSd.drvOffAll[0] = true;
+					HSd.drvOffAll[1] = true;
+					HSd.drvOffAll[2] = true;
+					HSd.drvOffAll[3] = true;
 					break;
-				case sCmd_drvOn:
-					HSd.drvOn = true;
+				case sCmd_drvOnS1:
+					if(debug) Serial.println("drvOnS1");
+					HSd.drvOn[0] = true;
 					break;
-				case sCmd_drvOff:
-					HSd.drvOff = true;
+				case sCmd_drvOnS2:
+					if(debug) Serial.println("drvOnS2");
+					HSd.drvOn[1] = true;
+					break;
+				case sCmd_drvOnS3:
+					if(debug) Serial.println("drvOnS3");
+					HSd.drvOn[2] = true;
+					break;
+				case sCmd_drvOnS4:
+					if(debug) Serial.println("drvOnS4");
+					HSd.drvOn[3] = true;
+					break;
+				case sCmd_drvOffS1:
+					if(debug) Serial.println("drvOffS1");
+					HSd.drvOff[0] = true;
+					break;
+				case sCmd_drvOffS2:
+					if(debug) Serial.println("drvOffS2");
+					HSd.drvOff[1] = true;
+					break;
+				case sCmd_drvOffS3:
+					if(debug) Serial.println("drvOffS3");
+					HSd.drvOff[2] = true;
+					break;
+				case sCmd_drvOffS4:
+					if(debug) Serial.println("drvOffS4");
+					HSd.drvOff[3] = true;
 					break;
 				default:
 					break;
 			}
+		} else {
+			if(debug) {
+				Serial.println("Column value not valid!");
+			}
+			HSd.coordError = true;
 		}
 		if(debug) {
-			Serial.print("sn: "); Serial.print(sn, DEC);
+			Serial.print("\nsn: "); Serial.print(sn, DEC);
 			Serial.print(" ...available? "); Serial.println((HSd.i2cSlaveAvailable[sn]) ? "yes" : "no");
 			
 		}
-		// work only for available devices
-		if(HSd.i2cSlaveAvailable[sn]) {
+		// work only for available devices AND available coordinates
+		if(HSd.i2cSlaveAvailable[sn] && !HSd.coordError) {
 			// calculate the linear position (piezo index) of the pair
 			// and save it as next item of the selected slave of 'HSpiezo'.
 			// !! always multiply by 9!! Not connected piezo will be skipped.
@@ -583,6 +635,7 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 				Serial.print(" / piCnt: "); Serial.println(HSd.piCnt[sn]-1);
 			}
 		}
+		HSd.coordError = false;
 	}
 }
 
@@ -593,9 +646,10 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 /* -------------------------------------------------------------------------- */
 void sendToSlave(uint8_t sn, uint8_t *mes, uint8_t len) {
 	if(debug) {
-		Serial.print("\nWriting to 0x");
-		Serial.print(sn, HEX);
-		Serial.print(": ");
+		Serial.print("\nWriting to 0x"); Serial.print(sn, HEX);
+		Serial.print(" (length: "); Serial.print(len, DEC);
+		Serial.println("):");
+		Serial.println("----------------------------------------");
 	}
   
 	Wire.beginTransmission(sn);		// address slave @ address sn

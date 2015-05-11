@@ -31,6 +31,17 @@
 
 struct HSdata HSd;
 
+void HSInit(void) {
+	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
+		HSd.piezoOffAll[i] = false;
+		HSd.drvOnAll[i] = false;
+		HSd.drvOffAll[i] = false;
+		HSd.drvOn[i] = false;
+		HSd.drvOff[i] = false;
+	}
+	HSd.coordError = false;
+}
+
 // ********************
 // MASTER FUNCTIONS...
 // ********************
@@ -333,16 +344,16 @@ struct HSdata HSd;
 // 					HSd.piezoOffAll = true;
 // 					break;
 // 				case sCmd_piezoOffS1:
-// 					HSd.piezoOff[0] = true;
+// 					HSd.piezoOffAll[0] = true;
 // 					break;
 // 				case sCmd_piezoOffS2:
-// 					HSd.piezoOff[1] = true;
+// 					HSd.piezoOffAll[1] = true;
 // 					break;
 // 				case sCmd_piezoOffS3:
-// 					HSd.piezoOff[2] = true;
+// 					HSd.piezoOffAll[2] = true;
 // 					break;
 // 				case sCmd_piezoOffS4:
-// 					HSd.piezoOff[3] = true;
+// 					HSd.piezoOffAll[3] = true;
 // 					break;
 // 				case sCmd_drvOffAll:
 // 					HSd.drvOffAll = true;

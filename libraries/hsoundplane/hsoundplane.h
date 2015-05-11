@@ -103,9 +103,16 @@ enum serialCommand {
 	sCmd_piezoOffS4,					// slave #4
 	
 	// switch on/off drivers drv2667
+	sCmd_drvOnAll,						// all on
 	sCmd_drvOffAll,						// all off
-	sCmd_drvOn,							// driver on * (slave# - gain)
-	sCmd_drvOff,						// driver off * (slave# - ...)
+	sCmd_drvOnS1,						// driver on slave #1 * (drv bitmask - gain)
+	sCmd_drvOnS2,						// driver on slave #2 * (drv bitmask - gain)
+	sCmd_drvOnS3,						// driver on slave #3 * (drv bitmask - gain)
+	sCmd_drvOnS4,						// driver on slave #4 * (drv bitmask - gain)
+	sCmd_drvOffS1,						// driver off slave #1 * (drv bitmask - ...)
+	sCmd_drvOffS2,						// driver off slave #2 * (drv bitmask - ...)
+	sCmd_drvOffS3,						// driver off slave #3 * (drv bitmask - ...)
+	sCmd_drvOffS4,						// driver off slave #4 * (drv bitmask - ...)
 };
 
 /* -------------------------------------------------------------------------- */
@@ -131,24 +138,25 @@ const uint32_t piezoArray3[8] = {
 
 typedef struct HSdata {
 	// flags...
-	bool piezoOff[HS_SLAVE_NUMBER];
-	bool piezoOffAll;
-	bool drvOffAll;
-	bool drvOff;
-	bool drvOn;
-	bool i2cSlaveAvailable[HS_SLAVE_NUMBER];
+	bool piezoOffAll[HS_SLAVE_NUMBER];				// piezos OFF (all) command for each slave
+	bool drvOnAll[HS_SLAVE_NUMBER];					// driver ON (all) command for each slave
+	bool drvOffAll[HS_SLAVE_NUMBER];				// drivers OFF (all) command for each slave
+	bool drvOff[HS_SLAVE_NUMBER];					// driver OFF command for each slave WITH DRV BITMASK @ NEXT BYTE
+	bool drvOn[HS_SLAVE_NUMBER];					// driver ON command for each slave WITH DRV BITMASK @ NEXT BYTE
+	bool i2cSlaveAvailable[HS_SLAVE_NUMBER];		// slave availability flags
+	bool coordError;
 	// data arrays...
 	uint8_t HScoord[HS_COORD_MAX][2];				// input HS coordinates send from computer to master
 	uint8_t HSpiezo[HS_SLAVE_NUMBER][HS_COORD_MAX];	// output HS piezo indexes for each slave
 	uint8_t piCnt[HS_SLAVE_NUMBER];					// piezo index counter for each slave
 	// i2c addresses...
-	int8_t i2cSlaveAddress[HS_SLAVE_NUMBER] = {					// slave addresses array
+	int8_t i2cSlaveAddress[HS_SLAVE_NUMBER] = {		// slave i2c addresses array
 		I2C_SLAVE_ADDR1,
 		I2C_SLAVE_ADDR2,
 		I2C_SLAVE_ADDR3,
 		I2C_SLAVE_ADDR4
 	};
-	int8_t i2cSwitchAddress[HS_SLAVE_NUMBER] = {					// i2c switch addresses array
+	int8_t i2cSwitchAddress[HS_SLAVE_NUMBER] = {	// i2c switch addresses array
 		I2C_SWITCH_ADDR1,
 		I2C_SWITCH_ADDR2,
 		I2C_SWITCH_ADDR3,
@@ -165,17 +173,18 @@ extern SPISettings settingsA;
 /* | FUNCTIONS																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
+void HSInit(void);
 // master functions
 // void slaveInit(bool, bool, uint8_t);
-void slaveRegister();
-bool slaveDrvSetup(int8_t, bool, bool, uint8_t);
-void slaveInitNotify(int8_t, bool);
-void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX]);
-void sendToSlave(uint8_t slaveNumber, uint8_t *message, uint8_t len);
-
-// slave functions
-void driverSetup(bool, bool on, uint8_t gain);
-void piezoSend(uint32_t val1, uint32_t val2, uint32_t val3);
+// void slaveRegister();
+// bool slaveDrvSetup(int8_t, bool, bool, uint8_t);
+// void slaveInitNotify(int8_t, bool);
+// void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX]);
+// void sendToSlave(uint8_t slaveNumber, uint8_t *message, uint8_t len);
+//
+// // slave functions
+// void driverSetup(bool, bool on, uint8_t gain);
+// void piezoSend(uint32_t val1, uint32_t val2, uint32_t val3);
 
 
 #endif
