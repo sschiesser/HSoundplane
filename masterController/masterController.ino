@@ -50,20 +50,18 @@ void setup()
 	syncPinState = !syncPinState;
 	digitalWrite(SYNC_PIN_1, syncPinState);
 	
+	// Waiting a bit to let the slaves starting up...
 	delay(STARTUP_WAIT_MS);
 	
+	// Initializing HSoundplane variables...
 	HSInit();
-	// for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
-	// 	HSd.piezoOffAll[i] = false;
-	// }
-	// HSd.piezoOffAll = false;
-	// HSd.drvOffAll = false;
 
 	// Setting up communication...
 	Serial.begin(SERIAL_SPEED);
 	Wire.begin(); // Start i2c
 	if(i2cFastMode) Wire.setClock(400000);
 	
+	// Welcome & information message...
 	if(debug) {
 		Serial.println("\nStarting up master controller...");
 		Serial.println("*************************************");
@@ -74,23 +72,27 @@ void setup()
 		Serial.println("**************************************\n");
 	}
 
-	// Initializing slaves
+	// Registering & initializing slaves...
 	slaveRegister();
 	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
 		delay(INIT_WAIT_MS);
 		
 		bool reset = true;
-		bool on = true;
+		bool on = false;
 		uint8_t gain = 3;
 		if(HSd.i2cSlaveAvailable[i]) {
 			if(debug) {
 				Serial.print("\nSetting up slave @ 0x"); Serial.print(HSd.i2cSlaveAddress[i], HEX);
-				Serial.println(":\n------------------------");
+				Serial.println("\n----------------------------------------");
 			}
+			// Setting up the drv2667 and notify if setup succeeded
 			bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], reset, on, gain);
+			slaveInitNotify(HSd.i2cSlaveAddress[i], setupOk);
+
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);
-			slaveInitNotify(HSd.i2cSlaveAddress[i], setupOk);
+
+			// Sending 0xFF to all registers (switching relays off)
 			sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
 		}
 	}
@@ -105,6 +107,9 @@ void setup()
 void loop()
 {  
 	char c;
+	bool reset, on;
+	uint8_t gain;
+	int8_t i2cAddr;
 	
 	// Collecting characters on the serial port started by '[' and terminated by ']'.
 	// Then process the received command line
@@ -113,9 +118,6 @@ void loop()
     
 		if(c == '[') {
 			command = "";
-			// if(debug) {
-			// 	Serial.println("'[' found, starting receiving");
-			// }
 		} else if(c == ']') {
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
@@ -156,12 +158,38 @@ void loop()
 						if(debug) {
 							Serial.print("\nSending piezo off command to slave #"); Serial.println(i, DEC);
 						}
-						sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
+						reset = false;
+						on = false;
+						gain = 0;
+						bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], reset, on, gain);
+						if(setupOk) {
+							if(debug) {
+								Serial.println("drv2667 switched off, closing relays");
+							}
+							sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
+						} else {
+							if(debug) {
+								Serial.println("drv2667 setup failed, nothing done!");
+							}
+						}
 					} else if(HSd.piCnt[i] > 0) {
 						if(debug) {
 							Serial.print("\nSending piezo settings to slave #"); Serial.println(i, DEC);
 						}
-						sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.piCnt[i]);
+						reset = false;
+						on = true;
+						gain = 3;
+						bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], reset, on, gain);
+						if(setupOk) {
+							if(debug) {
+								Serial.println("drv2667 switched on, setting up relays");
+							}
+							sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.piCnt[i]);
+						} else {
+							if(debug) {
+								Serial.println("drv2667 setup failed, nothing done!");
+							}
+						}
 					}
 				}
 				HSd.piezoOffAll[i] = false;
@@ -173,9 +201,6 @@ void loop()
 
 		} else {
 			command += c;
-			// if(debug) {
-			// 	Serial.print(c); Serial.print(" - "); Serial.println(command);
-			// }
 		}
 	}
 }
@@ -245,11 +270,13 @@ uint8_t convertStrToInt(String s)
 /* | slaveRegister															| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-void slaveRegister() {
+void slaveRegister()
+{
 	uint8_t receivedAddr;
   
 	if(debug) {
 		Serial.println("Registering slaves...");
+		Serial.println("----------------------------------------");
 	}
 
 	// Registering...
@@ -285,14 +312,15 @@ void slaveRegister() {
 /* | slaveDrvSetup															| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
+bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain)
+{
 	int8_t retVal;
 	bool initOk = true;
 	
 	// initialization...
 	if(reset) {
 		if(debug) {
-			Serial.println("Resetting drv2667...");
+			Serial.println("\nResetting drv2667...");
 			Serial.print("- addressing i2c switch @ 0x"); Serial.println(addr, HEX);
 		}
 
@@ -304,7 +332,7 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 			retVal = Wire.endTransmission();
 			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
 			if(debug) {
-				Serial.print("- opening switch #"); Serial.print(i, DEC);
+				Serial.print("\n- opening switch #"); Serial.print(i, DEC);
 				if(retVal == 0) {
 					Serial.println("\t\t\tsuccess!");
 				} else {
@@ -334,7 +362,7 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 		retVal = Wire.endTransmission();
 		initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
 		if(debug) {
-			Serial.print("- closing i2c swtich");
+			Serial.print("\n- closing i2c switch");
 			if(retVal == 0) {
 				Serial.println("\t\t\tsuccess!\n");
 			} else {
@@ -358,7 +386,7 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 			retVal = Wire.endTransmission();
 			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
 			if(debug) {
-				Serial.print("- opening switch #"); Serial.print(i, DEC);
+				Serial.print("\n- opening switch #"); Serial.print(i, DEC);
 				if(retVal == 0) {
 					Serial.println("\t\t\tsuccess!");					
 				} else {
@@ -375,9 +403,9 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 			if(debug) {
 				Serial.print("- waking up");
 				if(retVal == 0) {
-					Serial.println("\t\t\t\tsuccess!");
+					Serial.println("\t\t\t\t\tsuccess!");
 				} else {
-					Serial.println("\t\t\t\tERROR!");
+					Serial.println("\t\t\t\t\tERROR!");
 				}
 			}
 
@@ -388,7 +416,7 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 			retVal = Wire.endTransmission();
 			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
 			if(debug) {
-				Serial.print("- setting MUX and GAIN to 0x:"); Serial.print((INPUT_MUX | gain), HEX);
+				Serial.print("- setting MUX&GAIN to 0x:"); Serial.print((INPUT_MUX | gain), HEX);
 				if(retVal == 0) {
 					Serial.println("\tsuccess!");
 				} else {
@@ -418,7 +446,7 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 		retVal = Wire.endTransmission();
 		initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
 		if(debug) {
-			Serial.print("- closing i2c swtich");
+			Serial.print("\n- closing i2c switch");
 			if(retVal == 0) {
 				Serial.println("\t\t\tsuccess!");
 			} else {
@@ -440,7 +468,7 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 			retVal = Wire.endTransmission();
 			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
 			if(debug) {
-				Serial.print("- opening switch #"); Serial.print(i, DEC);
+				Serial.print("\n- opening switch #"); Serial.print(i, DEC);
 				if(retVal == 0) {
 					Serial.println("\t\t\tsuccess!");					
 				} else {
@@ -454,11 +482,11 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 			retVal = Wire.endTransmission();
 			initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
 			if(debug) {
-				Serial.println("- standing by");
+				Serial.print("- standing by");
 				if(retVal == 0) {
-					Serial.println("\t\t\tsuccess!");					
+					Serial.println("\t\t\t\t\tsuccess!");					
 				} else {
-					Serial.println("\t\t\tERROR!");					
+					Serial.println("\t\t\t\t\tERROR!");					
 				}
 			}
 		}
@@ -469,7 +497,7 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain) {
 		retVal = Wire.endTransmission();
 		initOk = ((retVal == 0) && (initOk == true)) ? true : false;		
 		if(debug) {
-			Serial.print("- closing i2c swtich");
+			Serial.print("\n- closing i2c switch");
 			if(retVal == 0) {
 				Serial.println("\t\t\tsuccess!");
 			} else {
@@ -494,8 +522,8 @@ void slaveInitNotify(int8_t addr, bool notification)
 	Wire.write((notification) ? 1 : 0);
 	Wire.endTransmission();
 	if(debug) {
-		Serial.print("Sending init notification to slave 0x"); Serial.println(addr, HEX);
-		Serial.print("- value: "); Serial.println((notification) ? "true" : "false");
+		Serial.print("\nSending init notification to slave 0x"); Serial.println(addr, HEX);
+		Serial.print("- value: "); Serial.println((notification) ? "true\n" : "false\n");
 	}
 }
 
@@ -504,7 +532,8 @@ void slaveInitNotify(int8_t addr, bool notification)
 /* | distributeCoordinates													| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX]) {
+void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX])
+{
 								
 	uint8_t mod = 0;					// index modulo
 	uint8_t sn = 0;						// slave number
@@ -664,16 +693,17 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 /* | sendToSlave															| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-void sendToSlave(uint8_t sn, uint8_t *mes, uint8_t len) {
+void sendToSlave(uint8_t sAddr, uint8_t *mes, uint8_t len)
+{
 	if(debug) {
-		Serial.print("\nWriting to 0x"); Serial.print(sn, HEX);
+		Serial.print("\nWriting to 0x"); Serial.print(sAddr, HEX);
 		Serial.print(" (length: "); Serial.print(len, DEC);
 		Serial.println("):");
 		Serial.println("----------------------------------------");
 	}
   
-	Wire.beginTransmission(sn);		// address slave @ address sn
-	Wire.write(i2cCmd_regSet);		// command byte with register set message
+	Wire.beginTransmission(sAddr);		// address slave @ sAddr
+	Wire.write(i2cCmd_regSet);			// command byte with register set message
 	for(uint8_t i = 0; i < len; i++) {
 		if(debug) {
 			Serial.print(mes[i], DEC); Serial.print("(0x");

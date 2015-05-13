@@ -128,32 +128,7 @@ void loop()
 {
 	// delay(1);
 	if(slaveInitFlag) {
-	// 	if(debug) {
-	// 		Serial.println("initializing drivers...");
-	// 	}
-	// 	bool reset = (Wire.read() == 1) ? true : false;
-	// 	bool on = (Wire.read() == 1) ? true : false;
-	// 	uint8_t gain = Wire.read();
-	// 	if(debug) {
-	// 		Serial.print("INIT: ");
-	// 		Serial.print("reset - "); Serial.print((reset) ? "true" : "false");
-	// 		Serial.print(" / ");
-	// 		Serial.print("switch on - "); Serial.print((on) ? "true" : "false");
-	// 		Serial.print(" / ");
-	// 		Serial.print("gain - "); Serial.println(gain, DEC);
-	// 		Serial.println("");
-	// 	}
-	// 	// for(uint8_t i = (switchAddress+1); i > 0; i--) {
-	// 	// 	delay(INIT_WAIT_MS);
-	// 	// }
-	// 	syncPinState = !syncPinState;
-	// 	digitalWrite(SYNC_PIN_1, syncPinState);
-	//
-	// 	// driverSetup(reset, on, gain);
-	// 	// slaveInitFlag = false;
-	//
-	// 	syncPinState = !syncPinState;
-	// 	digitalWrite(SYNC_PIN_1, syncPinState);
+
 	}
 	
 	if(slaveNotifyFlag) {
@@ -167,15 +142,15 @@ void loop()
 	} 
 	
 	if(slaveWriteFlag) {
-		syncPinState = !syncPinState;
-		digitalWrite(SYNC_PIN_1, syncPinState);
+		// syncPinState = !syncPinState;
+		// digitalWrite(SYNC_PIN_1, syncPinState);
 
 		// send the piezo bitmasks to the shift registers
 		piezoSend(piezoVal1, piezoVal2, piezoVal3);
 		slaveWriteFlag = false;
 
-		syncPinState = !syncPinState;
-		digitalWrite(SYNC_PIN_1, syncPinState);
+		// syncPinState = !syncPinState;
+		// digitalWrite(SYNC_PIN_1, syncPinState);
 	}
 }
 
@@ -220,7 +195,7 @@ void receiveEvent(int howmany)
 	
 	switch(received) {
 		case i2cCmd_regSet:
-		if(debug) {
+			if(debug) {
 			Serial.println("Setting shift registers...");
 		}
 			// receive all sent bytes and set (bitwise AND) the piezo bismasks
@@ -307,7 +282,8 @@ void receiveEvent(int howmany)
 /* | piezoSend																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-void piezoSend(uint32_t val1, uint32_t val2, uint32_t val3) {
+void piezoSend(uint32_t val1, uint32_t val2, uint32_t val3)
+{
 	digitalWrite(LED3_PIN, LOW);		// notify SPI activity
 	digitalWrite(LOAD_PIN, LOW);		// prepare LOAD pin
 	digitalWrite(CLR_PIN, LOW);			// reset all shift registers
