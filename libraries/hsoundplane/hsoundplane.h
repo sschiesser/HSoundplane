@@ -160,7 +160,9 @@ typedef struct HSdata {
 	// data arrays...
 	uint8_t HScoord[HS_COORD_MAX][2];				// input HS coordinates send from computer to master
 	uint8_t HSpiezo[HS_SLAVE_NUMBER][HS_COORD_MAX];	// output HS piezo indexes for each slave
-	uint8_t piCnt[HS_SLAVE_NUMBER];					// piezo index counter for each slave
+	uint8_t HSpiCnt[HS_SLAVE_NUMBER];					// piezo index counter for each slave
+	uint8_t HSdrvOn[HS_SLAVE_NUMBER][HS_DPS];
+	uint8_t HSdrvOnOld[HS_SLAVE_NUMBER][HS_DPS];
 
 	// i2c variables...
 	int8_t i2cSlaveAddress[HS_SLAVE_NUMBER] = {		// slave i2c addresses array

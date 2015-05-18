@@ -173,7 +173,7 @@ void loop()
 								Serial.println("drv2667 setup failed, nothing done!");
 							}
 						}
-					} else if(HSd.piCnt[i] > 0) {
+					} else if(HSd.HSpiCnt[i] > 0) {
 						syncPinState = !syncPinState;
 						digitalWrite(SYNC_PIN_1, syncPinState);
 						
@@ -190,7 +190,7 @@ void loop()
 							if(debug) {
 								Serial.println("drv2667 switched on, setting up relays");
 							}
-							sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.piCnt[i]);
+							sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.HSpiCnt[i]);
 						} else {
 							if(debug) {
 								Serial.println("drv2667 setup failed, nothing done!");
@@ -201,7 +201,7 @@ void loop()
 					}
 				}
 				HSd.piezoOffAll[i] = false;
-				HSd.piCnt[i] = 0;
+				HSd.HSpiCnt[i] = 0;
 			}
 
 			syncPinState = !syncPinState;
@@ -324,17 +324,20 @@ bool slaveDrvSetup(int8_t addr, int8_t drv, bool reset, bool on, uint8_t gain)
 {
 	int8_t retVal;
 	bool initOk = true;
+	uint8_t slaveNum = addr - I2C_SWITCH_ADDR1;
 	
 	// initialization...
 	if(reset) {
 		if(debug) {
-			Serial.println("\nResetting drv2667...");
+			Serial.println("\nResetting all drv2667...");
+			Serial.print("- slave# "); Serial.print(slaveNum, DEC);
+			Serial.print(" @ 0x"); Serial.println(addr, HEX);
+			Serial.print("- driver# "); Serial.println((drv == -1) ? "ALL" : String(drv));
 			Serial.print("- addressing i2c switch @ 0x"); Serial.println(addr, HEX);
 		}
-
-		// open the selected switch channel (all channels if drv = -1) and
+		// open the selected i2c switch channel (all channels if drv = -1) and
 		// send reset command to the attached drv2667
-		if(drv == -1) {
+		if(drv == -1) {			
 			for(uint8_t i = 0; i < HS_DPS; i++) {
 				// open switch
 				Wire.beginTransmission(addr);		
@@ -664,7 +667,7 @@ void slaveInitNotify(int8_t addr, bool notification)
 /* | distributeCoordinates													| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX])
+void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX])
 {
 								
 	uint8_t mod = 0;					// index modulo
@@ -775,6 +778,8 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 			}
 			HSd.colError = true;
 		}
+		
+		
 		if(!HSd.commandMode && !HSd.colError) {
 			if(debug) {
 				Serial.print("\nWorking on slave #"); Serial.print(sn, DEC); Serial.println("...");
@@ -799,17 +804,18 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 					// and save it as next item of the selected slave of 'HSpiezo'.
 					// !! always multiply by 9!! Not connected piezo will be skipped.
 					pi = ((orig[i][0] - mod) * 9) + (orig[i][1] * 2);
-					HSd.HSpiezo[sn][HSd.piCnt[sn]] = pi;
-					HSd.piCnt[sn] += 1;	// increment the pi counter of the selected slave
-		
+					HSd.HSpiezo[sn][HSd.HSpiCnt[sn]] = pi;
+					HSd.HSdrvOn[sn][HSd.HSpiCnt[sn]] = (orig[i][0] - mod);
+					HSd.HSpiCnt[sn] += 1;	// increment the pi counter of the selected slave
 					if(debug) {
 						uint8_t pi5 = ((orig[i][0] - mod) * 5) + orig[i][1];
 						// Serial.print("Slave#: "); Serial.print(sn);
 						Serial.print("- piezo#: "); Serial.print(pi, DEC);
 						Serial.print("("); Serial.print(pi5, DEC); Serial.println(")");
       
-						Serial.print("- HSpiezo: "); Serial.print(HSd.HSpiezo[sn][HSd.piCnt[sn]-1], DEC);
-						Serial.print(" / piCnt: "); Serial.println((HSd.piCnt[sn]-1), DEC);
+						Serial.print("- HSpiezo: "); Serial.print(HSd.HSpiezo[sn][HSd.HSpiCnt[sn]-1], DEC);
+						Serial.print(" / HSpiCnt: "); Serial.println((HSd.HSpiCnt[sn]-1), DEC);
+						Serial.print("- HSdrvOn: "); Serial.println(HSd.HSdrvOn[sn][HSd.HSpiCnt[sn]-1], DEC);
 					}
 				}
 			}
