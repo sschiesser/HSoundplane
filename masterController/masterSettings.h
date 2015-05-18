@@ -62,6 +62,10 @@ bool debug = true;						// DEBUG FLAG!!
   
 bool syncPinState;
 
+int8_t driver;
+uint8_t gain;
+bool on, reset;
+
 // String command;							// serial command to parse
 String slicedCmd[2 * HS_COORD_MAX];		// command line sliced into integers
 
@@ -74,5 +78,11 @@ extern struct HSdata HSd;
 /* | FUNCTIONS																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-uint8_t parseCommand(String);
+uint8_t sliceCommand(String s);
+uint8_t convertStrToInt(String s);
+void slaveRegister();
+bool slaveDrvSetup(int8_t addr, int8_t drv, bool reset, bool on, uint8_t gain);
+void slaveInitNotify(int8_t addr, bool notification);
+void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX]);
+void sendToSlave(uint8_t sAddr, uint8_t *mes, uint8_t len);
 #endif
