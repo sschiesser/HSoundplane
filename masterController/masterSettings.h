@@ -66,7 +66,6 @@ int8_t driver;
 uint8_t gain;
 bool on, reset;
 
-// String command;							// serial command to parse
 String slicedCmd[2 * HS_COORD_MAX];		// command line sliced into integers
 
 // extern...

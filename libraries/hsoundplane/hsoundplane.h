@@ -36,12 +36,12 @@
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 // HSoundplane characteristics
-#define HS_SLAVE_NUMBER	4			// number of slaves to drive (1 - 4)
-#define HS_COORD_MAX	16			// maximal amount of simultaneous coordinate pairs
-#define HS_CPS			8			// number of columns per slave (usually 8)
-#define HS_DPS			8			// number of drv2667 per slave (usually 8)
-#define HS_PIEZO_MAX	72			// absolute maximum available piezos on a slave
-#define HS_COL9_MODE	0
+#define HS_SLAVE_NUMBER		4			// number of slaves to drive (1 - 4)
+#define HS_COORD_MAX		16			// maximal amount of simultaneous coordinate pairs
+#define HS_CPS				8			// number of columns per slave (usually 8)
+#define HS_DPS				8			// number of drv2667 per slave (usually 8)
+#define HS_PIEZO_MAX		72			// absolute maximum available piezos on a slave
+#define HS_COL9_MODE		0
 
 // I2C addresses
 #define I2C_MASTER_ADDRESS	0x40		// i2c master address
@@ -160,7 +160,7 @@ typedef struct HSdata {
 	// data arrays...
 	uint8_t HScoord[HS_COORD_MAX][2];				// input HS coordinates send from computer to master
 	uint8_t HSpiezo[HS_SLAVE_NUMBER][HS_COORD_MAX];	// output HS piezo indexes for each slave
-	uint8_t HSpiCnt[HS_SLAVE_NUMBER];					// piezo index counter for each slave
+	uint8_t HSpiCnt[HS_SLAVE_NUMBER];				// piezo index counter for each slave
 	uint8_t HSdrvOn[HS_SLAVE_NUMBER][HS_DPS];
 	uint8_t HSdrvOnOld[HS_SLAVE_NUMBER][HS_DPS];
 

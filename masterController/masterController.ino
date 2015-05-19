@@ -40,23 +40,24 @@ String command;							// serial command to parse
 /* -------------------------------------------------------------------------- */
 void setup()
 {
-	// setting up sync pin(s)
+	// Set up sync pin(s)
 	syncPinState = false;
 	pinMode(SYNC_PIN_1, OUTPUT);
 	digitalWrite(SYNC_PIN_1, syncPinState);
 	
+	// Toggle sync pin on and off to notify startup
 	syncPinState = !syncPinState;
 	digitalWrite(SYNC_PIN_1, syncPinState);
 	syncPinState = !syncPinState;
 	digitalWrite(SYNC_PIN_1, syncPinState);
 	
-	// Waiting a bit to let the slaves starting up...
+	// Wait a bit to let the slaves starting up...
 	delay(STARTUP_WAIT_MS);
 	
-	// Initializing HSoundplane variables...
+	// Initialize HSoundplane variables...
 	HSInit();
 
-	// Setting up communication...
+	// Set up communication...
 	Serial.begin(SERIAL_SPEED);
 	Wire.begin(); // Start i2c
 	if(i2cFastMode) Wire.setClock(400000);
@@ -72,28 +73,32 @@ void setup()
 		Serial.println("**************************************\n");
 	}
 
-	// Registering & initializing slaves...
+	// Register slaves and list the avaiable ones
 	slaveRegister();
+	
+	// Perform initialization for each available slave
 	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
-		delay(INIT_WAIT_MS);
+		delay(INIT_WAIT_MS);	// wait some ms between each slave to avoid collisions
 		
+		// Reset all drv2667 and switch them off
 		driver = -1;
 		reset = true;
 		on = false;
-		gain = 3;
+		gain = 0;
 		if(HSd.i2cSlaveAvailable[i]) {
 			if(debug) {
 				Serial.print("\nSetting up slave @ 0x"); Serial.print(HSd.i2cSlaveAddress[i], HEX);
 				Serial.println("\n----------------------------------------");
 			}
-			// Setting up the drv2667 and notify if setup succeeded
+			// Set up the drv2667 and notify if succeeded
 			bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], driver, reset, on, gain);
 			slaveInitNotify(HSd.i2cSlaveAddress[i], setupOk);
 
+			// Toggle sync pin for time measurement
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);
 
-			// Sending 0xFF to all registers (switching relays off)
+			// Switch off all relays of selected slave
 			sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
 		}
 	}
@@ -109,105 +114,150 @@ void loop()
 {  
 	char c;
 	int8_t i2cAddr;
+	uint8_t strLength;
 	
-	// Collecting characters on the serial port started by '[' and terminated by ']'.
+	// Collect characters on the serial port started by '[' and terminated by ']'.
 	// Then process the received command line
 	if(Serial.available()) {
 		c = Serial.read();
     
+		// When start character received, empty the received string
 		if(c == '[') {
 			command = "";
-		} else if(c == ']') {
+		}
+		// When stop character received, process the string
+		else if(c == ']') {
+			// Toggle sync pin for time measurement
 			syncPinState = !syncPinState;
-			digitalWrite(SYNC_PIN_1, syncPinState);		// signalize command line reception
+			digitalWrite(SYNC_PIN_1, syncPinState);
 
-			command.trim();
-			uint8_t strLength = command.length();
+			command.trim();		// Trim leading and trailing spaces
 			if(debug) {
+				strLength = command.length();
 				Serial.print("\n\n****************************************\nNew command: "); Serial.print(command);
 				Serial.print(" (length: "); Serial.print(strLength); Serial.println(")");
 				Serial.print("****************************************\n");
 			}
+			
+			// Slice the received ASCII characters between spaces and
+			// put the slices into slicedCmd[] array
 			strLength = sliceCommand(command);
 
+			// Toggle sync pin for time measurement
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);		// measuring slicing time
 
+			// Input error check (odd coordinates)
 			uint8_t pairs = strLength / 2;
-			for(uint8_t i = 0; i < pairs; i++) {
-				HSd.HScoord[i][0] = convertStrToInt(slicedCmd[2*i]);
-				HSd.HScoord[i][1] = convertStrToInt(slicedCmd[(2*i)+1]);
-				if(debug) {
-					Serial.print("HScoord: "); Serial.print(HSd.HScoord[i][0]);
-					Serial.print(" "); Serial.println(HSd.HScoord[i][1]);
-				}
+			if(debug) {
+				Serial.print("\nPairs: "); Serial.print(pairs, DEC);
+				Serial.print(" x 2 = "); Serial.println((2 * pairs), DEC);
+				Serial.print("strLength: "); Serial.println(strLength, DEC);
 			}
+			if((2 * pairs) == strLength) {
+				// For each coordinate pair, convert the ASCII arrays into integers
+				// and fill the HSd.HScoord[][] pairs
+				for(uint8_t i = 0; i < pairs; i++) {
+					HSd.HScoord[i][0] = convertStrToInt(slicedCmd[2*i]);
+					HSd.HScoord[i][1] = convertStrToInt(slicedCmd[(2*i)+1]);
+					if(debug) {
+						Serial.print("HScoord: "); Serial.print(HSd.HScoord[i][0]);
+						Serial.print(" "); Serial.println(HSd.HScoord[i][1]);
+					}
+				}
 			
-			// syncPinState = !syncPinState;
-			// digitalWrite(SYNC_PIN_1, syncPinState);		// measure converting time
+				// Toggle sync pin for time measurement
+				// syncPinState = !syncPinState;
+				// digitalWrite(SYNC_PIN_1, syncPinState);
 
-			distributeCoordinates(pairs, HSd.HScoord, HSd.HSpiezo);
+				// Distribute HScoord to their corresponding slave and
+				// calculate for each the piezo index or serial command
+				distributeCoordinates(pairs, HSd.HScoord, HSd.HSpiezo);
 
-			// syncPinState = !syncPinState;
-			// digitalWrite(SYNC_PIN_1, syncPinState);		// measure distributing time
+				// Toggle sync pin for time measurement
+				// syncPinState = !syncPinState;
+				// digitalWrite(SYNC_PIN_1, syncPinState);
 
-			for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
-				if(HSd.i2cSlaveAvailable[i]) {
-					if(HSd.piezoOffAll[i]) {
-						if(debug) {
-							Serial.print("\nSending piezo off command to slave #"); Serial.println(i, DEC);
-						}
-						driver = -1;
-						reset = false;
-						on = false;
-						gain = 0;
-						bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], driver, reset, on, gain);
-
-						if(setupOk) {
+				// Command parser, resp. coordinate forwarder
+				for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
+					if(HSd.i2cSlaveAvailable[i]) {	// for each available slave...
+						// ...switch off all
+						if(HSd.piezoOffAll[i]) {
 							if(debug) {
-								Serial.println("drv2667 switched off, closing relays");
+								Serial.print("\nSending piezo off command to slave #"); Serial.println(i, DEC);
 							}
+							
+							// Switch off all drivers
+							driver = -1;
+							reset = false;
+							on = false;
+							gain = 0;
+							bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], driver, reset, on, gain);
+
+							if(debug) {
+								if(setupOk) {
+									Serial.println("drv2667 switched off, closing relays");
+								} else {
+									Serial.println("drv2667 setup failed!");
+								}
+							}
+							// Close all relays, if switching off successful or not
 							sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
-						} else {
-							if(debug) {
-								Serial.println("drv2667 setup failed, nothing done!");
-							}
 						}
-					} else if(HSd.HSpiCnt[i] > 0) {
-						syncPinState = !syncPinState;
-						digitalWrite(SYNC_PIN_1, syncPinState);
-						
-						if(debug) {
-							Serial.print("\nSending piezo settings to slave #"); Serial.println(i, DEC);
-						}
-						reset = false;
-						on = true;
-						gain = 3;
-						bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], driver, reset, on, gain);
-						if(setupOk) {
+						// ...send coordinate values
+						else if(HSd.HSpiCnt[i] > 0) {
+							// Toggle sync pin for time measurement
 							syncPinState = !syncPinState;
 							digitalWrite(SYNC_PIN_1, syncPinState);
 							if(debug) {
-								Serial.println("drv2667 switched on, setting up relays");
+								Serial.print("\nSending piezo settings to slave #"); Serial.println(i, DEC);
 							}
-							sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.HSpiCnt[i]);
-						} else {
-							if(debug) {
-								Serial.println("drv2667 setup failed, nothing done!");
+
+							// Switch on the corresponding driver with maximum gain
+							reset = false;
+							on = true;
+							gain = 3;
+							bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], driver, reset, on, gain);
+
+							if(setupOk) {
+								// Toggle sync pin for time measurement
+								syncPinState = !syncPinState;
+								digitalWrite(SYNC_PIN_1, syncPinState);
+
+								if(debug) {
+									Serial.println("drv2667 switched on, setting up relays");
+								}
+
+								sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.HSpiCnt[i]);
+							} else {
+								if(debug) {
+									Serial.println("drv2667 setup failed, nothing done!");
+								}
 							}
+
+							// Toggle sync pin for time measurement
+							syncPinState = !syncPinState;
+							digitalWrite(SYNC_PIN_1, syncPinState);
 						}
-						syncPinState = !syncPinState;
-						digitalWrite(SYNC_PIN_1, syncPinState);
 					}
+					// Reset all flags
+					HSd.piezoOffAll[i] = false;
+					HSd.HSpiCnt[i] = 0;
 				}
-				HSd.piezoOffAll[i] = false;
-				HSd.HSpiCnt[i] = 0;
+
+				// Toggle sync pin for time measurement
+				syncPinState = !syncPinState;
+				digitalWrite(SYNC_PIN_1, syncPinState);		// measure sending time
 			}
-
-			syncPinState = !syncPinState;
-			digitalWrite(SYNC_PIN_1, syncPinState);		// measure sending time
-
-		} else {
+			// Odd number of coordinates entered, doing nothing
+			else {
+				if(debug) {
+					Serial.println("Odd coordinate values, failed!");
+				}
+			}
+		}
+		// Concatenating currently entered input
+		else {
 			command += c;
 		}
 	}
