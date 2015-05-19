@@ -180,8 +180,9 @@ void loop()
 
 				// Command parser, resp. coordinate forwarder
 				for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
-					if(HSd.i2cSlaveAvailable[i]) {	// for each available slave...
-						// ...switch off all
+					// for each available slave...
+					if(HSd.i2cSlaveAvailable[i]) {
+						// ...switch off all relays
 						if(HSd.piezoOffAll[i]) {
 							if(debug) {
 								Serial.print("\nSending piezo off command to slave #"); Serial.println(i, DEC);
@@ -203,6 +204,22 @@ void loop()
 							}
 							// Close all relays, if switching off successful or not
 							sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
+						}
+						// ...switch on all drivers
+						else if(HSd.drvOnAll[i]) {
+							
+						}
+						// ...switfh off all drivers
+						else if(HSd.drvOffAll[i]) {
+							
+						}
+						// ...switch on drivers
+						else if(HSd.drvOn[i]) {
+							
+						}
+						// ...switch off drivers
+						else if(HSd.drvOff[i]) {
+							
 						}
 						// ...send coordinate values
 						else if(HSd.HSpiCnt[i] > 0) {
@@ -728,105 +745,130 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 	if(debug) {
 		Serial.print("\nDistributing coordinates... length: "); Serial.println(len);
 		Serial.println("----------------------------------------");
-			}
+	}
 	
 	for(uint8_t i = 0; i < len; i++) {
-		// check column value of a pair and assign it to the corresponding slave
-		if(orig[i][0] < HS_CPS) {
-			mod = 0;
-			sn = 0;
-		} else if(orig[i][0] < (2 * HS_CPS)) {
-			mod = HS_CPS;
-			sn = 1;
-		} else if(orig[i][0] < (3 * HS_CPS)) {
-			mod = 2 * HS_CPS;
-			sn = 2;
-		} else if(orig[i][0] < (4 * HS_CPS)) {
-			mod = 3 * HS_CPS;
-			sn = 3;
-		} else if(orig[i][0] == SERIAL_CMD_MODE) {
+		// check serial command mode and parse the different commands
+		if(orig[i][0] == SERIAL_CMD_MODE) {
 			if(debug) {
 				Serial.print("\nEntering command mode: ");
 			}
-			HSd.commandMode = true;
-			switch(orig[i][1]) {
-				case sCmd_piezoOffAll:
-					if(debug) Serial.println("piezoOffAll");
-					HSd.piezoOffAll[0] = true;
-					HSd.piezoOffAll[1] = true;
-					HSd.piezoOffAll[2] = true;
-					HSd.piezoOffAll[3] = true;
-					break;
-				case sCmd_piezoOffS1:
-					if(debug) Serial.println("piezoOffS1");
-					HSd.piezoOffAll[0] = true;
-					break;
-				case sCmd_piezoOffS2:
-					if(debug) Serial.println("piezoOffS2");
-					HSd.piezoOffAll[1] = true;
-					break;
-				case sCmd_piezoOffS3:
-					if(debug) Serial.println("piezoOffS3");
-					HSd.piezoOffAll[2] = true;
-					break;
-				case sCmd_piezoOffS4:
-					if(debug) Serial.println("piezoOffS4");
-					HSd.piezoOffAll[3] = true;
-					break;
-				case sCmd_drvOnAll:
-					if(debug) Serial.println("drvOnAll");
-					HSd.drvOnAll[0] = true;
-					HSd.drvOnAll[1] = true;
-					HSd.drvOnAll[2] = true;
-					HSd.drvOnAll[3] = true;
-					break;
-				case sCmd_drvOffAll:
-					if(debug) Serial.println("drvOffAll");
-					HSd.drvOffAll[0] = true;
-					HSd.drvOffAll[1] = true;
-					HSd.drvOffAll[2] = true;
-					HSd.drvOffAll[3] = true;
-					break;
-				case sCmd_drvOnS1:
-					if(debug) Serial.println("drvOnS1");
-					HSd.drvOn[0] = true;
-					break;
-				case sCmd_drvOnS2:
-					if(debug) Serial.println("drvOnS2");
-					HSd.drvOn[1] = true;
-					break;
-				case sCmd_drvOnS3:
-					if(debug) Serial.println("drvOnS3");
-					HSd.drvOn[2] = true;
-					break;
-				case sCmd_drvOnS4:
-					if(debug) Serial.println("drvOnS4");
-					HSd.drvOn[3] = true;
-					break;
-				case sCmd_drvOffS1:
-					if(debug) Serial.println("drvOffS1");
-					HSd.drvOff[0] = true;
-					break;
-				case sCmd_drvOffS2:
-					if(debug) Serial.println("drvOffS2");
-					HSd.drvOff[1] = true;
-					break;
-				case sCmd_drvOffS3:
-					if(debug) Serial.println("drvOffS3");
-					HSd.drvOff[2] = true;
-					break;
-				case sCmd_drvOffS4:
-					if(debug) Serial.println("drvOffS4");
-					HSd.drvOff[3] = true;
-					break;
-				default:
-					break;
+			HSd.commandMode = true;		// set command mode flage for following byte
+			switch(orig[i][1]) {		// test command...
+			case sCmd_piezoOffAll:		// ...switch off all piezos on all slaves
+				if(debug) Serial.println("piezoOffAll");
+				HSd.piezoOffAll[0] = true;
+				HSd.piezoOffAll[1] = true;
+				HSd.piezoOffAll[2] = true;
+				HSd.piezoOffAll[3] = true;
+				break;
+			case sCmd_piezoOffS1:		// ...switch off all piezos on slave 1
+				if(debug) Serial.println("piezoOffS1");
+				HSd.piezoOffAll[0] = true;
+				break;
+			case sCmd_piezoOffS2:		// ...switch off all piezos on slave 2
+				if(debug) Serial.println("piezoOffS2");
+				HSd.piezoOffAll[1] = true;
+				break;
+			case sCmd_piezoOffS3:		// ...switch off all piezos on slave 3
+				if(debug) Serial.println("piezoOffS3");
+				HSd.piezoOffAll[2] = true;
+				break;
+			case sCmd_piezoOffS4:		// ...switch off all piezos on slave 4
+				if(debug) Serial.println("piezoOffS4");
+				HSd.piezoOffAll[3] = true;
+				break;
+			case sCmd_drvOnAll:			// ...switch on all drivers on all slaves
+				if(debug) Serial.println("drvOnAll");
+				HSd.drvOnAll[0] = true;
+				HSd.drvOnAll[1] = true;
+				HSd.drvOnAll[2] = true;
+				HSd.drvOnAll[3] = true;
+				break;
+			case sCmd_drvOffAll:		// ...switch off all drivers on all slaves
+				if(debug) Serial.println("drvOffAll");
+				HSd.drvOffAll[0] = true;
+				HSd.drvOffAll[1] = true;
+				HSd.drvOffAll[2] = true;
+				HSd.drvOffAll[3] = true;
+				break;
+			case sCmd_drvOnS1:			// ...switch on drivers on slave 1 (*)
+				if(debug) Serial.println("drvOnS1");
+				HSd.drvOn[0] = true;
+				break;
+			case sCmd_drvOnS2:			// ...switch on drivers on slave 2 (*)
+				if(debug) Serial.println("drvOnS2");
+				HSd.drvOn[1] = true;
+				break;
+			case sCmd_drvOnS3:			// ...switch on drivers on slave 3 (*)
+				if(debug) Serial.println("drvOnS3");
+				HSd.drvOn[2] = true;
+				break;
+			case sCmd_drvOnS4:			// ...switch on drivers on slave 4 (*)
+				if(debug) Serial.println("drvOnS4");
+				HSd.drvOn[3] = true;
+				break;
+			case sCmd_drvOffS1:			// ...switch off drivers on slave 1 (*)
+				if(debug) Serial.println("drvOffS1");
+				HSd.drvOff[0] = true;
+				break;
+			case sCmd_drvOffS2:			// ...switch off drivers on slave 2 (*)
+				if(debug) Serial.println("drvOffS2");
+				HSd.drvOff[1] = true;
+				break;
+			case sCmd_drvOffS3:			// ...switch off drivers on slave 3 (*)
+				if(debug) Serial.println("drvOffS3");
+				HSd.drvOff[2] = true;
+				break;
+			case sCmd_drvOffS4:			// ...switch off drivers on slave 4 (*)
+				if(debug) Serial.println("drvOffS4");
+				HSd.drvOff[3] = true;
+				break;
+			default:
+				break;
 			}
-		} else {
-			if(debug) {
+		}
+		// If not command mode, first test following byte,
+		// second calculate piezo index
+		else {
+			if(HSd.commandMode) {
+				
+			}
+			if(HSd.drvOn[0]) {
+				
+			} else if(HSd.drvOn[1]) {
+				
+			} else if(HSd.drvOn[2]) {
+				
+			} else if(HSd.drvOn[3]) {
+				
+			} else if(HSd.drvOff[0]) {
+				
+			} else if(HSd.drvOff[1]) {
+				
+			} else if(HSd.drvOff[2]) {
+				
+			} else if(HSd.drvOff[3]) {
+				
+			}
+			if(orig[i][0] < HS_CPS) {
+				mod = 0;
+				sn = 0;
+			} else if(orig[i][0] < (2 * HS_CPS)) {
+				mod = HS_CPS;
+				sn = 1;
+			} else if(orig[i][0] < (3 * HS_CPS)) {
+				mod = 2 * HS_CPS;
+				sn = 2;
+			} else if(orig[i][0] < (4 * HS_CPS)) {
+				mod = 3 * HS_CPS;
+				sn = 3;
+			} else {
+				if(debug) {
 				Serial.println("\nColumn value not valid! No slave...");
 			}
-			HSd.colError = true;
+				HSd.colError = true;
+			}
 		}
 		
 		
