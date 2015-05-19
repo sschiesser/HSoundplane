@@ -162,6 +162,11 @@ void loop()
 							Serial.print("\nSending piezo settings to slave #"); Serial.println(i, DEC);
 						}
 						sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.piCnt[i]);
+					} else if(HSd.piCnt[i] == 0) {
+						if(debug) {
+							Serial.print("\nClosing relays of slave #"); Serial.println(i, DEC);
+						}
+						sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
 					}
 				}
 				HSd.piezoOffAll[i] = false;
