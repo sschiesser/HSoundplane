@@ -57,6 +57,15 @@
 // Serial value to enter serial command mode
 #define SERIAL_CMD_MODE		0xFF		// serial command start byte
 
+#define CMD_BITMASK_DRV0	(1 << 0)
+#define CMD_BITMASK_DRV1	(1 << 1)
+#define CMD_BITMASK_DRV2	(1 << 2)
+#define CMD_BITMASK_DRV3	(1 << 3)
+#define CMD_BITMASK_DRV4	(1 << 4)
+#define CMD_BITMASK_DRV5	(1 << 5)
+#define CMD_BITMASK_DRV6	(1 << 6)
+#define CMD_BITMASK_DRV7	(1 << 7)
+
 // Pinout of the arduino nano on the driver board
 #define LED1_PIN			3			// LED1 -> device started up
 #define LED2_PIN			5			// LED2 -> drv2667 enabled

@@ -50,13 +50,13 @@ void setup()
 	digitalWrite(SYNC_PIN_1, syncPinState);
 	syncPinState = !syncPinState;
 	digitalWrite(SYNC_PIN_1, syncPinState);
+
+	// Initialize HSoundplane variables...
+	HSInit();
 	
 	// Wait a bit to let the slaves starting up...
 	delay(STARTUP_WAIT_MS);
 	
-	// Initialize HSoundplane variables...
-	HSInit();
-
 	// Set up communication...
 	Serial.begin(SERIAL_SPEED);
 	Wire.begin(); // Start i2c
@@ -236,6 +236,9 @@ void loop()
 							syncPinState = !syncPinState;
 							digitalWrite(SYNC_PIN_1, syncPinState);
 						}
+						else if(HSd.piCnt[i] == 0) {
+							sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
+						}
 					}
 					// Reset all flags
 					HSd.piezoOffAll[i] = false;
@@ -333,25 +336,28 @@ void slaveRegister()
 		Serial.println("----------------------------------------");
 	}
 
-	// Registering...
+	// Registering each slave...
 	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
-		Wire.requestFrom(HSd.i2cSlaveAddress[i], 1);
-    
-		while(Wire.available()) {
-			receivedAddr = Wire.read();
-			if(receivedAddr == HSd.i2cSlaveAddress[i]) {
-				HSd.i2cSlaveAvailable[i] = true;
-			} else {
-				HSd.i2cSlaveAvailable[i] = false;
+		// If registration doesn't succeed, retry several times to be sure
+		for(uint8_t j = 0; j < SLAVE_REG_RETRIES; j++) {
+			Wire.requestFrom(HSd.i2cSlaveAddress[i], 1);
+			while(Wire.available()) {
+				receivedAddr = Wire.read();
+				if(receivedAddr == HSd.i2cSlaveAddress[i]) {
+					HSd.i2cSlaveAvailable[i] = true;
+					j = SLAVE_REG_RETRIES;
+				} else {
+					HSd.i2cSlaveAvailable[i] = false;
+				}
 			}
 		}
 		
-		if(HSd.i2cSlaveAvailable[i] == true) {
-			slaveInitNotify(HSd.i2cSlaveAddress[i], false);
-		}
 		if(debug) {
 			Serial.print("Slave @ address 0x"); Serial.print(HSd.i2cSlaveAddress[i], HEX);
 			Serial.println((HSd.i2cSlaveAvailable[i]) ? " available" : " NOT available");
+		}
+		if(HSd.i2cSlaveAvailable[i] == true) {
+			slaveInitNotify(HSd.i2cSlaveAddress[i], false);
 		}
 	}
 	if(debug) {
@@ -575,8 +581,8 @@ void slaveInitNotify(int8_t addr, bool notification)
 	Wire.write((notification) ? 1 : 0);
 	Wire.endTransmission();
 	if(debug) {
-		Serial.print("\nSending init notification to slave 0x"); Serial.println(addr, HEX);
-		Serial.print("- value: "); Serial.println((notification) ? "true\n" : "false\n");
+		Serial.print("\nSending notification to slave 0x"); Serial.print(addr, HEX);
+		Serial.println((notification) ? ": true\n" : ": false\n");
 	}
 }
 
@@ -685,11 +691,12 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 		// Check (second) if command mode already entered and
 		// supplementary values have to be read
 		else if(cmdMode) {
-			if(debug) {
-				Serial.println("\nReading command mode supplementary byte");
-			}
 			uint8_t drvBitMask = orig[i][0];
-			// HSd.commandMode = false;
+			if(debug) {
+				Serial.print("\nReading command mode supplementary byte: 0x");
+				Serial.println(drvBitMask, HEX);
+			}
+			break;
 		}
 		// Check (finally) column value of a pair and assign it to the corresponding slave.
 		// Note that coordinate system of the HSoundplane is a bit error generating:
@@ -735,7 +742,8 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 			}
 			
 			// work only for available devices AND slave correctly set up
-			if((HSd.i2cSlaveAvailable[sn]) && (HSd.i2cSlaveSetup[sn])) {
+			// if((HSd.i2cSlaveAvailable[sn]) && (HSd.i2cSlaveSetup[sn])) {
+			if((HSd.i2cSlaveAvailable[sn])) {
 				// Check if raw value entered correctly
 				if(HSd.col9) {
 					if(orig[i][1] > 8) {
@@ -775,11 +783,12 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 				}
 			}
 		}
-		// Reset all flags
+		// Reset all flags within the loop to be able to process other coordinates
 		cErr = false;
 		rErr = false;
-		cmdMode = false;
 	}
+	// Reset command mode flag
+	cmdMode = false;
 }
 
 /* -------------------------------------------------------------------------- */

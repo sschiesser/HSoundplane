@@ -33,14 +33,16 @@
 /* | MACROS																	| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-#define I2C_FAST_MODE		1			// 0 -> standad mode (100 kHz) i2c,
+#define I2C_FAST_MODE		0			// 0 -> standad mode (100 kHz) i2c,
 										// 1 -> fast mode (400 kHz)
 #define SERIAL_SPEED		230400		// serial communication speed for
 										// 1. host command reception (CDC or rawHID)
 										// 2. debugging
 
-#define STARTUP_WAIT_MS		50			// startup waiting time to let the slaves be ready
-#define INIT_WAIT_MS		5			// initialization waiting time to SEE slave getting ready
+#define STARTUP_WAIT_MS		1000		// startup waiting time to let the slaves be ready
+#define INIT_WAIT_MS		50			// initialization waiting time to SEE slave getting ready
+
+#define SLAVE_REG_RETRIES	5
 
 #define SYNC_PIN_1			2			// pin used to measure time between events
 
@@ -50,7 +52,7 @@
 /* | VARIABLES																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool debug = true;						// DEBUG FLAG!!
+bool debug = false;						// DEBUG FLAG!!
 
 #if(I2C_FAST_MODE > 0)					// i2c speed flag
   bool i2cFastMode = true;
