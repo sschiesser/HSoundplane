@@ -592,6 +592,9 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 	uint8_t sn = 0;						// slave number
 	uint8_t pi = 0;						// piezo index
 	uint8_t col = 0;
+	bool cErr = false;					// column input error flag
+	bool rErr = false;					// raw input error flag
+	bool cmdMode = false;				// command mode flag
 
 	if(debug) {
 		Serial.print("\nDistributing coordinates... length: "); Serial.println(len);
@@ -604,7 +607,7 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 			if(debug) {
 				Serial.print("\nEntering command mode: ");
 			}
-			HSd.commandMode = true;
+			cmdMode = true;
 			switch(orig[i][1]) {
 				case sCmd_piezoOffAll:
 					if(debug) Serial.println("piezoOffAll");
@@ -681,7 +684,7 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 		}
 		// Check (second) if command mode already entered and
 		// supplementary values have to be read
-		else if(HSd.commandMode) {
+		else if(cmdMode) {
 			if(debug) {
 				Serial.println("\nReading command mode supplementary byte");
 			}
@@ -718,12 +721,11 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 				if(debug) {
 					Serial.println("\nColumn value not valid! No slave...");
 				}
-				HSd.colError = true;
+				cErr = true;
 			}
 		}
-		
-		
-		if(!HSd.commandMode && !HSd.colError) {
+	
+		if(!cmdMode && !cErr) {
 			if(debug) {
 				Serial.print("\nWorking on slave #"); Serial.print(sn, DEC); Serial.println("...");
 				Serial.print("- col value = "); Serial.println((orig[i][0] - mod), DEC);
@@ -731,20 +733,29 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 				Serial.print("- available? "); Serial.println((HSd.i2cSlaveAvailable[sn]) ? "yes" : "no");
 				Serial.print("- setup ok? "); Serial.println((HSd.i2cSlaveSetup[sn]) ? "yes" : "no");
 			}
+			
 			// work only for available devices AND slave correctly set up
 			if((HSd.i2cSlaveAvailable[sn]) && (HSd.i2cSlaveSetup[sn])) {
-				if(HSd.col9 && (orig[i][1] > 8)) {
-					HSd.rawError = true;
+				// Check if raw value entered correctly
+				if(HSd.col9) {
+					if(orig[i][1] > 8) {
+						// HSd.rawError = true;
+						rErr = true;
+						if(debug) {
+							Serial.println("Raw value not valid (> 8)!");
+						}						
+					}
+				} else {
+					if(orig[i][1] > 4) {
+						// HSd.rawError = true;
+						rErr = true;
+						if(debug) {
+							Serial.println("Raw value not valid (> 4)!");
+						}						
+					}
 				}
-				else if(!HSd.col9 && (orig[i][1] > 4)) {
-					HSd.rawError = true;
-				}			
-				if(debug && HSd.rawError) {
-					Serial.print("Raw value not valid (> "); Serial.print((HSd.col9) ? "8" : "4");
-					Serial.println(")!");
-				}
-				
-				if(!HSd.rawError) {
+
+				if(!rErr) {
 					// calculate the linear position (piezo index) of the pair
 					// and save it as next item of the selected slave of 'HSpiezo'.
 					// !! always multiply by 9!! Not connected piezo will be skipped.
@@ -764,9 +775,10 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 				}
 			}
 		}
-		HSd.commandMode = false;
-		HSd.colError = false;
-		HSd.rawError = false;
+		// Reset all flags
+		cErr = false;
+		rErr = false;
+		cmdMode = false;
 	}
 }
 

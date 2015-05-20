@@ -42,7 +42,4 @@ void HSInit(void) {
 		HSd.i2cSlaveAvailable[i] = false;
 		HSd.i2cSlaveSetup[i] = false;
 	}
-	HSd.commandMode = false;
-	HSd.colError = false;
-	HSd.rawError = false;
 }
