@@ -38,6 +38,9 @@ void HSInit(void) {
 		HSd.drvOffAll[i] = false;
 		HSd.drvOn[i] = false;
 		HSd.drvOff[i] = false;
+		
+		HSd.i2cSlaveAvailable[i] = false;
+		HSd.i2cSlaveSetup[i] = false;
 	}
 	HSd.commandMode = false;
 	HSd.colError = false;

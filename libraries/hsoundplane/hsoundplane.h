@@ -176,6 +176,7 @@ typedef struct HSdata {
 		I2C_SWITCH_ADDR4
 	};
 	bool i2cSlaveAvailable[HS_SLAVE_NUMBER];		// slave availability flags
+	bool i2cSlaveSetup[HS_SLAVE_NUMBER];			// slave correctly set up flags
 };
 
 

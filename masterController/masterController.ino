@@ -89,8 +89,8 @@ void setup()
 				Serial.println("\n----------------------------------------");
 			}
 			// Set up the drv2667 and notify if succeeded
-			bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], reset, on, gain);
-			slaveInitNotify(HSd.i2cSlaveAddress[i], setupOk);
+			HSd.i2cSlaveSetup[i] = slaveDrvSetup(HSd.i2cSwitchAddress[i], reset, on, gain);
+			slaveInitNotify(HSd.i2cSlaveAddress[i], HSd.i2cSlaveSetup[i]);
 
 			// Toggle sync pin for time measurement
 			syncPinState = !syncPinState;
@@ -360,7 +360,6 @@ void slaveRegister()
 }
 
 
-
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 /* | slaveDrvSetup															| */
@@ -457,9 +456,9 @@ bool slaveDrvSetup(int8_t addr, bool reset, bool on, uint8_t gain)
 			if(debug) {
 				Serial.print("- waking up");
 				if(retVal == 0) {
-					Serial.println("\t\t\t\tsuccess!");
+					Serial.println("\t\t\t\t\tsuccess!");
 				} else {
-					Serial.println("\t\t\t\tERROR!");
+					Serial.println("\t\t\t\t\tERROR!");
 				}
 			}
 
@@ -597,23 +596,11 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 	if(debug) {
 		Serial.print("\nDistributing coordinates... length: "); Serial.println(len);
 		Serial.println("----------------------------------------");
-			}
+	}
 	
 	for(uint8_t i = 0; i < len; i++) {
-		// check column value of a pair and assign it to the corresponding slave
-		if(orig[i][0] < HS_CPS) {
-			mod = 0;
-			sn = 0;
-		} else if(orig[i][0] < (2 * HS_CPS)) {
-			mod = HS_CPS;
-			sn = 1;
-		} else if(orig[i][0] < (3 * HS_CPS)) {
-			mod = 2 * HS_CPS;
-			sn = 2;
-		} else if(orig[i][0] < (4 * HS_CPS)) {
-			mod = 3 * HS_CPS;
-			sn = 3;
-		} else if(orig[i][0] == SERIAL_CMD_MODE) {
+		// Check (first) if command mode was entered
+		if(orig[i][0] == SERIAL_CMD_MODE) {
 			if(debug) {
 				Serial.print("\nEntering command mode: ");
 			}
@@ -691,31 +678,72 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 				default:
 					break;
 			}
-		} else {
-			if(debug) {
-				Serial.println("\nColumn value not valid! No slave...");
-			}
-			HSd.colError = true;
 		}
+		// Check (second) if command mode already entered and
+		// supplementary values have to be read
+		else if(HSd.commandMode) {
+			if(debug) {
+				Serial.println("\nReading command mode supplementary byte");
+			}
+			uint8_t drvBitMask = orig[i][0];
+			// HSd.commandMode = false;
+		}
+		// Check (finally) column value of a pair and assign it to the corresponding slave.
+		// Note that coordinate system of the HSoundplane is a bit error generating:
+		// - Soundplane input example:		(6, 3)
+		// - HSoundplane coordinate:		(7, 3)
+		// - Corresponding audio channel:	8
+		// This is due to the fact that the 4 haptic slaves are made of 8 channels each,
+		// with first (0) and last (31) one are used for audio purpose. That means that
+		// the Soundplane columns 0 to 29 correspond to the haptic columns 1 to 30, on
+		// audio channels 2 to 31!
+		// Thus, first of all, add 1 to the input column number!
+		else {
+			orig[i][0] += 1;
+			if(orig[i][0] < HS_CPS) {
+				mod = 0;
+				sn = 0;
+			} else if(orig[i][0] < (2 * HS_CPS)) {
+				mod = HS_CPS;
+				sn = 1;
+			} else if(orig[i][0] < (3 * HS_CPS)) {
+				mod = 2 * HS_CPS;
+				sn = 2;
+			} else if(orig[i][0] < (4 * HS_CPS)) {
+				mod = 3 * HS_CPS;
+				sn = 3;
+			}
+			// Nothing matched... something went entered wrong.
+			else {
+				if(debug) {
+					Serial.println("\nColumn value not valid! No slave...");
+				}
+				HSd.colError = true;
+			}
+		}
+		
+		
 		if(!HSd.commandMode && !HSd.colError) {
 			if(debug) {
 				Serial.print("\nWorking on slave #"); Serial.print(sn, DEC); Serial.println("...");
 				Serial.print("- col value = "); Serial.println((orig[i][0] - mod), DEC);
 				Serial.print("- raw value = "); Serial.println(orig[i][1], DEC);
 				Serial.print("- available? "); Serial.println((HSd.i2cSlaveAvailable[sn]) ? "yes" : "no");
+				Serial.print("- setup ok? "); Serial.println((HSd.i2cSlaveSetup[sn]) ? "yes" : "no");
 			}
-			// work only for available devices AND available coordinates
-			if(HSd.i2cSlaveAvailable[sn]) {
+			// work only for available devices AND slave correctly set up
+			if((HSd.i2cSlaveAvailable[sn]) && (HSd.i2cSlaveSetup[sn])) {
 				if(HSd.col9 && (orig[i][1] > 8)) {
 					HSd.rawError = true;
 				}
 				else if(!HSd.col9 && (orig[i][1] > 4)) {
 					HSd.rawError = true;
-				}
+				}			
 				if(debug && HSd.rawError) {
 					Serial.print("Raw value not valid (> "); Serial.print((HSd.col9) ? "8" : "4");
 					Serial.println(")!");
 				}
+				
 				if(!HSd.rawError) {
 					// calculate the linear position (piezo index) of the pair
 					// and save it as next item of the selected slave of 'HSpiezo'.
