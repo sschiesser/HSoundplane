@@ -39,14 +39,18 @@
 										// 1. host command reception (CDC or rawHID)
 										// 2. debugging
 
-#define SERIAL_CMD_START	253
-#define SERIAL_CMD_STOP		255
-#define SERIAL_CMD_MAXLEN	250
+#define SERIAL_CMD_START	253			// serial command start byte
+#define SERIAL_CMD_STOP		255			// serial command stop byte
+#define SERIAL_CMD_COORD	150			// maximum amount of coordinate pairs that
+										// can be send to the serial command
+										// Above: special command mode values
+#define SERIAL_CMD_SETTINGS	200			// settings mode byte
 
 #define SERIAL_ERR_NOERROR	0
 #define SERIAL_ERR_MISMATCH	1
 #define SERIAL_ERR_LENGTH	2
 #define SERIAL_ERR_OVERFLOW	3
+#define SERIAL_ERR_CRLF		255
 
 #define STARTUP_WAIT_MS		1000		// startup waiting time to let the slaves be ready
 #define INIT_WAIT_MS		50			// initialization waiting time to SEE slave getting ready
@@ -61,7 +65,7 @@
 /* | VARIABLES																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool debug = false;						// DEBUG FLAG!!
+bool debug = true;						// DEBUG FLAG!!
 
 #if(I2C_FAST_MODE > 0)					// i2c speed flag
   bool i2cFastMode = true;
@@ -71,7 +75,7 @@ bool debug = false;						// DEBUG FLAG!!
   
 bool syncPinState;
 
-String slicedCmd[2 * HS_COORD_MAX];		// command line sliced into integers
+// String slicedCmd[2 * HS_COORD_MAX];		// command line sliced into integers
 
 // extern...
 extern struct HSdata HSd;

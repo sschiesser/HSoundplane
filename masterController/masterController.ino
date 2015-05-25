@@ -34,7 +34,7 @@
 // String command;							// serial command to parse
 
 // uint8_t cmd[250];
-bool cmdReadLen = false;
+bool cmdByteOne = false;
 bool cmdError = false;
 int8_t cmdLength;
 int8_t cmdIndexCnt;
@@ -119,7 +119,6 @@ void loop()
 {
 	byte b;
 	int8_t i2cAddr;
-	// uint8_t strLength;
 	
 	// Collect characters on the serial port started by '[' and terminated by ']'.
 	// Then process the received command line
@@ -127,35 +126,58 @@ void loop()
 		b = Serial.read();
     
 		// When start character received...
+		// --------------------------------
 		if(b == SERIAL_CMD_START) {
 		    // reset the command index counter and prepare reading length
 			cmdIndexCnt = 0;
-			cmdReadLen = true;
+			cmdByteOne = true;
 		}
+		
 		// When length reading flag active...
-		else if(cmdReadLen) {
-			cmdLength = b;
-			// Check if size value is correct (i.e. size <= 250 and even)
-			if( (b <= SERIAL_CMD_MAXLEN) && ((b % 2) == 0) ) {
-				// Entered byte = number of coordinates items
-				// cmdLength = b;
-			} else {
-				// Reset cmdLength and send back length error message
-				cmdLength = 0;
-				if(debug) {
-					Serial.print("ERROR#"); Serial.print(SERIAL_ERR_LENGTH, DEC);
-					Serial.println("! Incorrect length");
-				} else {
-					Serial.write(SERIAL_ERR_LENGTH);
-					Serial.write(255);
-				}
-				// cmdError = true;
+		// ----------------------------------
+		else if(cmdByteOne) {
+			// Check if length value is correct (i.e. < 150 pairs)
+			if( (b <= SERIAL_CMD_COORD) ) {
+				cmdLength = b;			// Entered byte = number of coordinates pairs
+				// cmdLength = (2 * b);
+				cmdIndexCnt = 0;		// Reset cmdIndexCnt for later matching test
 			}
-			cmdReadLen = false;
-			cmdIndexCnt = 0;
+			// Otherwise, check if settings mode called
+			else {
+				switch(b) {
+					case SERIAL_CMD_POFF:
+					break;
+					
+					case SERIAL_CMD_DON:
+					break;
+					
+					case SERIAL_CMD_DOFF:
+					break;
+					
+					case SERIAL_CMD_VERBOSE:
+					break;
+					
+					default:
+					// Reset cmdLength and send back length error message
+					cmdLength = 0;
+					if(debug) {
+						Serial.print("ERROR#"); Serial.print(SERIAL_ERR_LENGTH, DEC);
+						Serial.println("! Incorrect length");
+					} else {
+						Serial.write(SERIAL_ERR_LENGTH);
+						Serial.write(SERIAL_ERR_CRLF);
+					}
+				}
+			}
+			cmdByteOne = false;
 		}
+		
 		// When stop character received...
+		// -------------------------------
+		// else if( (b == SERIAL_CMD_STOP) && (cmdIndexCnt == cmdLength) ) {
 		else if(b == SERIAL_CMD_STOP) {
+			if(!)
+		}
 			// Toggle sync pin for time measurement
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);
@@ -197,12 +219,18 @@ void loop()
 					Serial.println("! Mismatch");
 				} else {
 					Serial.write(SERIAL_ERR_MISMATCH);
-					Serial.println();
+					Serial.write(SERIAL_ERR_CRLF);
 				}
 			}
 		}
+		
 		// Concatenating currently entered input
+		// -------------------------------------
 		else {
+			if(debug) {
+				Serial.print("cmdIndexCnt = "); Serial.print(cmdIndexCnt, DEC);
+				Serial.print(", cmdLength = "); Serial.println(cmdLength, DEC);
+			}
 			uint8_t col = ( ((cmdIndexCnt % 2) == 0) ? (cmdIndexCnt/2) : ((cmdIndexCnt-1)/2) );
 			if( (cmdIndexCnt % 2) == 0) {
 				HSd.HScoord[col][0] = b;
