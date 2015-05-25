@@ -23,6 +23,31 @@
 //  PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
 //  HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION 
 //  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+//  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE ////////////////////////////////////////////////////////////////////////////
+//
+//  This file is part of HSoundplane library
+//
+//	Works with the following hardware (150415):
+//		- Soundplane piezo-driver v0.95 - R003
+//		- Soundplane piezo-layer v.095 - R006
+//
+//  Copyright (c) 2015, www.icst.net
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy of 
+//  this software and associated documentation files (the "Software"), to deal in 
+//  the Software without restriction, including without limitation the rights to use, 
+//  copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the 
+//  Software, and to permit persons to whom the Software is furnished to do so, 
+//  subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all 
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+//  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
+//  PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
+//  HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION 
+//  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
 //  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #ifndef _MASTERSETTINGS_H
@@ -39,18 +64,27 @@
 										// 1. host command reception (CDC or rawHID)
 										// 2. debugging
 
-#define SERIAL_CMD_START	253			// serial command start byte
-#define SERIAL_CMD_STOP		255			// serial command stop byte
-#define SERIAL_CMD_COORD	150			// maximum amount of coordinate pairs that
-										// can be send to the serial command
-										// Above: special command mode values
-#define SERIAL_CMD_SETTINGS	200			// settings mode byte
+#define SCMD_START			253			// serial command start byte
+#define SCMD_STOP			255			// serial command stop byte
+#define SCMD_SETTINGS		100			// threshold value above wich
+										// setting commands are sent
+#define SCMD_POFF_ALL		110
+#define SCMD_DOFF_ALL		120
+#define SCMD_DOFF_S1		121
+#define SCMD_DOFF_S2		122
+#define SCMD_DOFF_S3		123
+#define SCMD_DOFF_S4		124
+#define SCMD_DON_ALL		130
+#define SCMD_DON_S1			131
+#define SCMD_DON_S2			132
+#define SCMD_DON_S3			133
+#define SCMD_DON_S4			134
 
-#define SERIAL_ERR_NOERROR	0
-#define SERIAL_ERR_MISMATCH	1
-#define SERIAL_ERR_LENGTH	2
-#define SERIAL_ERR_OVERFLOW	3
-#define SERIAL_ERR_CRLF		255
+#define SERR_NOERROR		0
+#define SERR_MISMATCH		1
+#define SERR_LENGTH			2
+#define SERR_OVERFLOW		3
+#define SERR_CRLF			255
 
 #define STARTUP_WAIT_MS		1000		// startup waiting time to let the slaves be ready
 #define INIT_WAIT_MS		50			// initialization waiting time to SEE slave getting ready

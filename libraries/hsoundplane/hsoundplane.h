@@ -55,7 +55,7 @@
 #define I2C_SWITCH_ADDR4	0x73		// i2c switch4 address
 
 // Serial value to enter serial command mode
-#define SERIAL_CMD_MODE		0xFF		// serial command start byte
+// #define SERIAL_CMD_MODE		0xFF		// serial command start byte
 
 #define CMD_BITMASK_DRV0	(1 << 0)
 #define CMD_BITMASK_DRV1	(1 << 1)

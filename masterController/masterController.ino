@@ -35,7 +35,8 @@
 
 // uint8_t cmd[250];
 bool cmdByteOne = false;
-bool cmdError = false;
+bool cmdZeroLen = false;
+// bool cmdError = false;
 int8_t cmdLength;
 int8_t cmdIndexCnt;
 
@@ -127,80 +128,65 @@ void loop()
     
 		// When start character received...
 		// --------------------------------
-		if(b == SERIAL_CMD_START) {
+		if(b == SCMD_START) {
 		    // reset the command index counter and prepare reading length
+			if(debug) {
+				Serial.println("Start byte received...");
+			}
 			cmdIndexCnt = 0;
 			cmdByteOne = true;
 		}
 		
-		// When length reading flag active...
-		// ----------------------------------
-		else if(cmdByteOne) {
-			// Check if length value is correct (i.e. < 150 pairs)
-			if( (b <= SERIAL_CMD_COORD) ) {
-				cmdLength = b;			// Entered byte = number of coordinates pairs
-				// cmdLength = (2 * b);
-				cmdIndexCnt = 0;		// Reset cmdIndexCnt for later matching test
-			}
-			// Otherwise, check if settings mode called
-			else {
-				switch(b) {
-					case SERIAL_CMD_POFF:
-					break;
-					
-					case SERIAL_CMD_DON:
-					break;
-					
-					case SERIAL_CMD_DOFF:
-					break;
-					
-					case SERIAL_CMD_VERBOSE:
-					break;
-					
-					default:
-					// Reset cmdLength and send back length error message
-					cmdLength = 0;
-					if(debug) {
-						Serial.print("ERROR#"); Serial.print(SERIAL_ERR_LENGTH, DEC);
-						Serial.println("! Incorrect length");
-					} else {
-						Serial.write(SERIAL_ERR_LENGTH);
-						Serial.write(SERIAL_ERR_CRLF);
-					}
-				}
-			}
-			cmdByteOne = false;
-		}
-		
 		// When stop character received...
 		// -------------------------------
-		// else if( (b == SERIAL_CMD_STOP) && (cmdIndexCnt == cmdLength) ) {
-		else if(b == SERIAL_CMD_STOP) {
-			if(!)
-		}
-			// Toggle sync pin for time measurement
-			syncPinState = !syncPinState;
-			digitalWrite(SYNC_PIN_1, syncPinState);
-
+		else if(b == SCMD_STOP) {
 			if(debug) {
-				Serial.print("\r\n\r\n****************************************\r\nNew command: "); 
-				for(uint8_t i = 0; i < (cmdIndexCnt/2); i++) {
-					uint8_t col = ( ((i % 2) == 0) ? (i/2) : ((i-1)/2) );
-						Serial.print(HSd.HScoord[i][0], DEC); Serial.print(" ");
-						Serial.print(HSd.HScoord[i][1], DEC); Serial.print(" ");
-					// Serial.print(cmd[i], DEC); Serial.print(" ");
+				Serial.println("Stop byte received...");
+			}
+
+			// Check if stop byte is simultaneously byte one (MSG: "START STOP")
+			if(cmdByteOne) {
+				if(debug) {
+					Serial.println("Start/stop message received");
+				} else {
+					Serial.write(SERR_NOERROR);
+					Serial.write(SERR_CRLF);
 				}
-				Serial.print(" (l = "); Serial.print(cmdIndexCnt, DEC); Serial.println(")");
-				Serial.print(" Entered length: "); Serial.println(cmdLength, DEC);
-				Serial.print("****************************************\r\n");
+
+				// Close all relays of all available slaves
+				for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
+					if(HSd.i2cSlaveAvailable[i]) {	// for each available slave...
+						if(debug) {
+							Serial.print("\nSending piezo off command to slave #"); Serial.println(i, DEC);
+						}
+						sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
+					}
+				}
+				cmdByteOne = false;			// Reset byte one flag
 			}
 			
-			// Verify if command index counter corresponds to the entered command length
-			if( (cmdIndexCnt != 0) && (cmdIndexCnt == cmdLength) ) {
+			// Verify if entered command length corresponds to counted items
+			else if(cmdIndexCnt == cmdLength) {
 				if(debug) {
-					Serial.println("Processing entered data...");
+					Serial.print("\r\n\r\n****************************************\r\nNew command: "); 
+					for(uint8_t i = 0; i < (cmdIndexCnt/2); i++) {
+						uint8_t col = ( ((i % 2) == 0) ? (i/2) : ((i-1)/2) );
+						Serial.print(HSd.HScoord[i][0], DEC); Serial.print(" ");
+						Serial.print(HSd.HScoord[i][1], DEC); Serial.print(" ");
+						// Serial.print(cmd[i], DEC); Serial.print(" ");
+					}
+					Serial.print(" (l = "); Serial.print(cmdIndexCnt, DEC); Serial.println(")");
+					Serial.print(" Entered length: "); Serial.println(cmdLength, DEC);
+					Serial.print("****************************************\r\n");
+				} else {
+					Serial.write(SERR_NOERROR);
+					Serial.write(SERR_CRLF);
 				}
 				
+				// Toggle sync pin for time measurement
+				syncPinState = !syncPinState;
+				digitalWrite(SYNC_PIN_1, syncPinState);
+
 				distributeCoordinates((cmdLength/2), HSd.HScoord, HSd.HSpiezo);
 
 				// Toggle sync pin for time measurement
@@ -213,29 +199,42 @@ void loop()
 				syncPinState = !syncPinState;
 				digitalWrite(SYNC_PIN_1, syncPinState);
 
-			} else {
+			}
+			
+			// When checks did not match, send a mismatch error
+			else {
 				if(debug) {
-					Serial.print("ERROR#"); Serial.print(SERIAL_ERR_MISMATCH, DEC);
+					Serial.print("ERROR#"); Serial.print(SERR_MISMATCH, DEC);
 					Serial.println("! Mismatch");
 				} else {
-					Serial.write(SERIAL_ERR_MISMATCH);
-					Serial.write(SERIAL_ERR_CRLF);
+					Serial.write(SERR_MISMATCH);
+					Serial.write(SERR_CRLF);
 				}
 			}
 		}
 		
-		// Concatenating currently entered input
-		// -------------------------------------
+		// When cmdByteOne flag is active...
+		// ---------------------------------
+		else if(cmdByteOne) {
+			cmdLength = b;
+			cmdByteOne = false;
+		}
+		
+		// Concatenating currently entered input...
+		// ----------------------------------------
 		else {
 			if(debug) {
 				Serial.print("cmdIndexCnt = "); Serial.print(cmdIndexCnt, DEC);
 				Serial.print(", cmdLength = "); Serial.println(cmdLength, DEC);
 			}
-			uint8_t col = ( ((cmdIndexCnt % 2) == 0) ? (cmdIndexCnt/2) : ((cmdIndexCnt-1)/2) );
+			
+			// cmdIndexCnt is indexed for each byte, while the HScoord table saves coordinate
+			// pairs of half length
+			uint8_t p = ( ((cmdIndexCnt % 2) == 0) ? (cmdIndexCnt/2) : ((cmdIndexCnt-1)/2) );
 			if( (cmdIndexCnt % 2) == 0) {
-				HSd.HScoord[col][0] = b;
+				HSd.HScoord[p][0] = b;
 			} else {
-				HSd.HScoord[col][1] = b;
+				HSd.HScoord[p][1] = b;
 			}
 
 			cmdIndexCnt += 1;
@@ -253,7 +252,7 @@ void parseCommand(void)
 {
 	// Command parser, resp. coordinate forwarder
 	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
-		if(HSd.i2cSlaveAvailable[i]) {	// for each available slave...
+		// if(HSd.i2cSlaveAvailable[i]) {	// for each available slave...
 			// ...switch off all
 			if(HSd.piezoOffAll[i]) {
 				if(debug) {
@@ -281,7 +280,7 @@ void parseCommand(void)
 			else if(HSd.piCnt[i] == 0) {
 				sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
 			}
-		}
+		// }
 		// Reset all flags
 		HSd.piezoOffAll[i] = false;
 		HSd.piCnt[i] = 0;
@@ -578,98 +577,55 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 		Serial.println("----------------------------------------");
 	}
 	
+	// For each coordinate pair, the first item is tested.
+	// If it is above a threshold value, a setting mode is entered FOR THE GIVEN PAIR!
+	// Else the pair is processed like a standard coordinate.
 	for(uint8_t i = 0; i < len; i++) {
 		// Check (first) if command mode was entered
-		if(orig[i][0] == SERIAL_CMD_MODE) {
-			if(debug) {
-				Serial.print("\nEntering command mode: ");
-			}
+		if(orig[i][0] >= SCMD_SETTINGS) {
 			cmdMode = true;
-			switch(orig[i][1]) {
-				case sCmd_piezoOffAll:
-					if(debug) Serial.println("piezoOffAll");
-					HSd.piezoOffAll[0] = true;
-					HSd.piezoOffAll[1] = true;
-					HSd.piezoOffAll[2] = true;
-					HSd.piezoOffAll[3] = true;
-					break;
-				case sCmd_piezoOffS1:
-					if(debug) Serial.println("piezoOffS1");
-					HSd.piezoOffAll[0] = true;
-					break;
-				case sCmd_piezoOffS2:
-					if(debug) Serial.println("piezoOffS2");
-					HSd.piezoOffAll[1] = true;
-					break;
-				case sCmd_piezoOffS3:
-					if(debug) Serial.println("piezoOffS3");
-					HSd.piezoOffAll[2] = true;
-					break;
-				case sCmd_piezoOffS4:
-					if(debug) Serial.println("piezoOffS4");
-					HSd.piezoOffAll[3] = true;
-					break;
-				case sCmd_drvOnAll:
-					if(debug) Serial.println("drvOnAll");
-					HSd.drvOnAll[0] = true;
-					HSd.drvOnAll[1] = true;
-					HSd.drvOnAll[2] = true;
-					HSd.drvOnAll[3] = true;
-					break;
-				case sCmd_drvOffAll:
-					if(debug) Serial.println("drvOffAll");
-					HSd.drvOffAll[0] = true;
-					HSd.drvOffAll[1] = true;
-					HSd.drvOffAll[2] = true;
-					HSd.drvOffAll[3] = true;
-					break;
-				case sCmd_drvOnS1:
-					if(debug) Serial.println("drvOnS1");
-					HSd.drvOn[0] = true;
-					break;
-				case sCmd_drvOnS2:
-					if(debug) Serial.println("drvOnS2");
-					HSd.drvOn[1] = true;
-					break;
-				case sCmd_drvOnS3:
-					if(debug) Serial.println("drvOnS3");
-					HSd.drvOn[2] = true;
-					break;
-				case sCmd_drvOnS4:
-					if(debug) Serial.println("drvOnS4");
-					HSd.drvOn[3] = true;
-					break;
-				case sCmd_drvOffS1:
-					if(debug) Serial.println("drvOffS1");
-					HSd.drvOff[0] = true;
-					break;
-				case sCmd_drvOffS2:
-					if(debug) Serial.println("drvOffS2");
-					HSd.drvOff[1] = true;
-					break;
-				case sCmd_drvOffS3:
-					if(debug) Serial.println("drvOffS3");
-					HSd.drvOff[2] = true;
-					break;
-				case sCmd_drvOffS4:
-					if(debug) Serial.println("drvOffS4");
-					HSd.drvOff[3] = true;
-					break;
+			switch(orig[i][0]) {
+				// Switch off all relays of slave# given in orig[i][1]
+				case SCMD_POFF_ALL:
+				HSd.piezoOffAll[orig[i][1]] = true;
+				break;
+				// Switch off all drivers of slave# given in orig[i][1]
+				case SCMD_DOFF_ALL:
+				break;
+				// Switch off drivers of slave1 according to the bitmask in orig[i][1]
+				case SCMD_DOFF_S1:
+				break;
+				// Switch off drivers of slave2 according to the bitmask in orig[i][1]
+				case SCMD_DOFF_S2:
+				break;
+				// Switch off drivers of slave3 according to the bitmask in orig[i][1]
+				case SCMD_DOFF_S3:
+				break;
+				// Switch off drivers of slave4 according to the bitmask in orig[i][1]
+				case SCMD_DOFF_S4:
+				break;
+				// Switch on all drivers of slave# given in orig[i][1]
+				case SCMD_DON_ALL:
+				break;
+				// Switch on drivers of slave1 according to the bitmask in orig[i][1]
+				case SCMD_DON_S1:
+				break;
+				// Switch on drivers of slave2 according to the bitmask in orig[i][1]
+				case SCMD_DON_S2:
+				break;
+				// Switch on drivers of slave3 according to the bitmask in orig[i][1]
+				case SCMD_DON_S3:
+				break;
+				// Switch on drivers of slave4 according to the bitmask in orig[i][1]
+				case SCMD_DON_S4:
+				break;
+				// No command match
 				default:
-					break;
+				break;
 			}
 		}
-		// Check (second) if command mode already entered and
-		// supplementary values have to be read
-		else if(cmdMode) {
-			uint8_t drvBitMask = orig[i][0];
-			if(debug) {
-				Serial.print("\nReading command mode supplementary byte: 0x");
-				Serial.println(drvBitMask, HEX);
-			}
-			break;
-		}
-		// Check (finally) column value of a pair and assign it to the corresponding slave.
+
+		// Check column value of a pair and assign it to the corresponding slave.
 		// Note that coordinate system of the HSoundplane is a bit error generating:
 		// - Soundplane input example:		(6, 3)
 		// - HSoundplane coordinate:		(7, 3)
@@ -684,19 +640,6 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 			sn = orig[i][0] / HS_CPS;
 			mod = sn * HS_CPS;
 			
-			// if(orig[i][0] < HS_CPS) {
-			// 	mod = 0;
-			// 	sn = 0;
-			// } else if(orig[i][0] < (2 * HS_CPS)) {
-			// 	mod = HS_CPS;
-			// 	sn = 1;
-			// } else if(orig[i][0] < (3 * HS_CPS)) {
-			// 	mod = 2 * HS_CPS;
-			// 	sn = 2;
-			// } else if(orig[i][0] < (4 * HS_CPS)) {
-			// 	mod = 3 * HS_CPS;
-			// 	sn = 3;
-			// }
 			// Nothing matched... something went entered wrong.
 			if(orig[i][0] > 30) {
 				if(debug) {
@@ -715,8 +658,7 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 				Serial.print("- setup ok? "); Serial.println((HSd.i2cSlaveSetup[sn]) ? "yes" : "no");
 			}
 			
-			// work only for available devices AND slave correctly set up
-			// if((HSd.i2cSlaveAvailable[sn]) && (HSd.i2cSlaveSetup[sn])) {
+			// work only for available devices
 			if((HSd.i2cSlaveAvailable[sn])) {
 				// Check if raw value entered correctly
 				if(HSd.col9) {
