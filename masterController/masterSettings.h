@@ -69,16 +69,16 @@
 #define SCMD_SETTINGS		100			// threshold value above wich
 										// setting commands are sent
 #define SCMD_POFF_ALL		110
-#define SCMD_DOFF_ALL		120
+#define SCMD_DOFF_S0		120
 #define SCMD_DOFF_S1		121
 #define SCMD_DOFF_S2		122
 #define SCMD_DOFF_S3		123
-#define SCMD_DOFF_S4		124
-#define SCMD_DON_ALL		130
+#define SCMD_DOFF_ALL		129
+#define SCMD_DON_S0			130
 #define SCMD_DON_S1			131
 #define SCMD_DON_S2			132
 #define SCMD_DON_S3			133
-#define SCMD_DON_S4			134
+#define SCMD_DON_ALL		139
 
 #define SERR_NOERROR		0
 #define SERR_MISMATCH		1

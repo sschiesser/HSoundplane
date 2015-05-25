@@ -36,8 +36,8 @@ void HSInit(void) {
 		HSd.piezoOffAll[i] = false;
 		HSd.drvOnAll[i] = false;
 		HSd.drvOffAll[i] = false;
-		HSd.drvOn[i] = false;
-		HSd.drvOff[i] = false;
+		HSd.drvOn[i] = 0;
+		HSd.drvOff[i] = 0;
 		
 		HSd.i2cSlaveAvailable[i] = false;
 		HSd.i2cSlaveSetup[i] = false;

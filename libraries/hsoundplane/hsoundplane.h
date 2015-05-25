@@ -160,8 +160,8 @@ typedef struct HSdata {
 	bool piezoOffAll[HS_SLAVE_NUMBER];				// piezos OFF (all) command for each slave
 	bool drvOnAll[HS_SLAVE_NUMBER];					// driver ON (all) command for each slave
 	bool drvOffAll[HS_SLAVE_NUMBER];				// drivers OFF (all) command for each slave
-	bool drvOn[HS_SLAVE_NUMBER];					// driver ON command for each slave WITH DRV BITMASK @ NEXT BYTE
-	bool drvOff[HS_SLAVE_NUMBER];					// driver OFF command for each slave WITH DRV BITMASK @ NEXT BYTE
+	uint8_t drvOn[HS_SLAVE_NUMBER];					// driver ON command for each slave
+	uint8_t drvOff[HS_SLAVE_NUMBER];				// driver OFF command for each slave
 	
 	// data arrays...
 	uint8_t HScoord[HS_COORD_MAX][2];				// input HS coordinates send from computer to master

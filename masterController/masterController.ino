@@ -155,17 +155,39 @@ void loop()
 
 				// Close all relays of all available slaves
 				for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
-					if(HSd.i2cSlaveAvailable[i]) {	// for each available slave...
+					// if(HSd.i2cSlaveAvailable[i]) {	// for each available slave...
 						if(debug) {
 							Serial.print("\nSending piezo off command to slave #"); Serial.println(i, DEC);
 						}
 						sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
-					}
+					// }
 				}
 				cmdByteOne = false;			// Reset byte one flag
 			}
 			
-			// Verify if entered command length corresponds to counted items
+			// When counted items < entered length, test index counter eveness
+			else if(cmdIndexCnt < cmdLength) {
+				if(debug) {
+					Serial.print("cmdIndexCnt = "); Serial.print(cmdIndexCnt, DEC);
+					Serial.print(", cmdLength = "); Serial.println(cmdLength, DEC);
+				}
+
+				if((cmdIndexCnt % 2) == 0) {
+					if(debug) {
+						Serial.print("ERROR#"); Serial.print(SERR_MISMATCH);
+						Serial.println("! Counted & entered lengths don't match");
+					} else {
+						Serial.write(SERR_MISMATCH);
+						Serial.write(SERR_CRLF);
+					}
+				} else {
+					HSd.HScoord[(cmdIndexCnt-1)/2][1] = b;
+				}
+
+				cmdIndexCnt += 1;
+			}
+
+			// When counted items = entered length, serial entry probably finished
 			else if(cmdIndexCnt == cmdLength) {
 				if(debug) {
 					Serial.print("\r\n\r\n****************************************\r\nNew command: "); 
@@ -201,22 +223,23 @@ void loop()
 
 			}
 			
-			// When checks did not match, send a mismatch error
-			else {
+			// When counted items > entered length, notify length error
+			else if(cmdIndexCnt > cmdLength) {
 				if(debug) {
-					Serial.print("ERROR#"); Serial.print(SERR_MISMATCH, DEC);
-					Serial.println("! Mismatch");
+					Serial.print("ERROR#"); Serial.print(SERR_LENGTH, DEC);
+					Serial.println("! Incorrect lengths");
 				} else {
-					Serial.write(SERR_MISMATCH);
+					Serial.write(SERR_LENGTH);
 					Serial.write(SERR_CRLF);
 				}
 			}
+
 		}
 		
 		// When cmdByteOne flag is active...
 		// ---------------------------------
 		else if(cmdByteOne) {
-			cmdLength = b;
+			cmdLength = (2 * b);
 			cmdByteOne = false;
 		}
 		
@@ -253,13 +276,47 @@ void parseCommand(void)
 	// Command parser, resp. coordinate forwarder
 	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
 		// if(HSd.i2cSlaveAvailable[i]) {	// for each available slave...
-			// ...switch off all
+			// ...switch off all piezos (relay)
 			if(HSd.piezoOffAll[i]) {
 				if(debug) {
-					Serial.print("\nSending piezo off command to slave #"); Serial.println(i, DEC);
+					Serial.print("\nSwitching off piezos on slave#");
+					Serial.println(i, DEC);
 				}
 				// Close all relays, if switching off successful or not
 				sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
+				HSd.piezoOffAll[i] = false;
+			}
+			// ...swich off all drivers
+			else if(HSd.drvOffAll[i]) {
+				if(debug) {
+					Serial.print("\nSwitching off all drivers on slave#");
+					Serial.println(i, DEC);
+				}
+				HSd.drvOffAll[i] = false;
+			}
+			// ...switch on all drivers
+			else if(HSd.drvOnAll[i]) {
+				if(debug) {
+					Serial.print("\nSwitching on all drivers on slave#");
+					Serial.println(i, DEC);
+				}
+				HSd.drvOnAll[i] = false;
+			}
+			// ...switch off selected drivers
+			else if(HSd.drvOff[i] > 0) {
+				if(debug) {
+					Serial.print("\nSwitching off drivers "); Serial.print(HSd.drvOff[i], BIN);
+					Serial.print(" on slave#"); Serial.println(i, DEC);
+				}
+				HSd.drvOff[i] = 0;
+			}
+			// ...switch on selected drivers
+			else if(HSd.drvOn[i] > 0) {
+				if(debug) {
+					Serial.print("\nSwitching on drivers "); Serial.print(HSd.drvOn[i], BIN);
+					Serial.print(" on slave#"); Serial.println(i, DEC);
+				}
+				HSd.drvOn[i] = 0;
 			}
 			// ...send coordinate values
 			else if(HSd.piCnt[i] > 0) {
@@ -589,35 +646,45 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 				case SCMD_POFF_ALL:
 				HSd.piezoOffAll[orig[i][1]] = true;
 				break;
-				// Switch off all drivers of slave# given in orig[i][1]
-				case SCMD_DOFF_ALL:
-				break;
 				// Switch off drivers of slave1 according to the bitmask in orig[i][1]
-				case SCMD_DOFF_S1:
+				case SCMD_DOFF_S0:
+				HSd.drvOff[0] = orig[i][1];
 				break;
 				// Switch off drivers of slave2 according to the bitmask in orig[i][1]
-				case SCMD_DOFF_S2:
+				case SCMD_DOFF_S1:
+				HSd.drvOff[1] = orig[i][1];
 				break;
 				// Switch off drivers of slave3 according to the bitmask in orig[i][1]
-				case SCMD_DOFF_S3:
+				case SCMD_DOFF_S2:
+				HSd.drvOff[2] = orig[i][1];
 				break;
 				// Switch off drivers of slave4 according to the bitmask in orig[i][1]
-				case SCMD_DOFF_S4:
+				case SCMD_DOFF_S3:
+				HSd.drvOff[3] = orig[i][1];
+				break;
+				// Switch off all drivers of slave# given in orig[i][1]
+				case SCMD_DOFF_ALL:
+				HSd.drvOffAll[orig[i][1]] = true;
+				break;
+				// Switch on drivers of slave1 according to the bitmask in orig[i][1]
+				case SCMD_DON_S0:
+				HSd.drvOn[0] = orig[i][1];
+				break;
+				// Switch on drivers of slave2 according to the bitmask in orig[i][1]
+				case SCMD_DON_S1:
+				HSd.drvOn[1] = orig[i][1];
+				break;
+				// Switch on drivers of slave3 according to the bitmask in orig[i][1]
+				case SCMD_DON_S2:
+				HSd.drvOn[2] = orig[i][1];
+				break;
+				// Switch on drivers of slave4 according to the bitmask in orig[i][1]
+				case SCMD_DON_S3:
+				HSd.drvOn[3] = orig[i][1];
 				break;
 				// Switch on all drivers of slave# given in orig[i][1]
 				case SCMD_DON_ALL:
-				break;
-				// Switch on drivers of slave1 according to the bitmask in orig[i][1]
-				case SCMD_DON_S1:
-				break;
-				// Switch on drivers of slave2 according to the bitmask in orig[i][1]
-				case SCMD_DON_S2:
-				break;
-				// Switch on drivers of slave3 according to the bitmask in orig[i][1]
-				case SCMD_DON_S3:
-				break;
-				// Switch on drivers of slave4 according to the bitmask in orig[i][1]
-				case SCMD_DON_S4:
+				HSd.drvOnAll[orig[i][1]] = true;
 				break;
 				// No command match
 				default:
