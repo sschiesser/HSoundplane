@@ -31,7 +31,14 @@
 #include "hsoundplane.h"
 #include "masterSettings.h"
 
-String command;							// serial command to parse
+// String command;							// serial command to parse
+
+// uint8_t cmd[250];
+bool cmdReadLen = false;
+bool cmdError = false;
+int8_t cmdLength;
+int8_t cmdIndexCnt;
+
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -109,218 +116,154 @@ void setup()
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 void loop()
-{  
-	char c;
+{
+	byte b;
 	int8_t i2cAddr;
-	uint8_t strLength;
+	// uint8_t strLength;
 	
 	// Collect characters on the serial port started by '[' and terminated by ']'.
 	// Then process the received command line
 	if(Serial.available()) {
-		c = Serial.read();
+		b = Serial.read();
     
-		// When start character received, empty the received string
-		if(c == '[') {
-			command = "";
+		// When start character received...
+		if(b == SERIAL_CMD_START) {
+		    // reset the command index counter and prepare reading length
+			cmdIndexCnt = 0;
+			cmdReadLen = true;
 		}
-		// When stop character received, process the string
-		else if(c == ']') {
+		// When length reading flag active...
+		else if(cmdReadLen) {
+			cmdLength = b;
+			// Check if size value is correct (i.e. size <= 250 and even)
+			if( (b <= SERIAL_CMD_MAXLEN) && ((b % 2) == 0) ) {
+				// Entered byte = number of coordinates items
+				// cmdLength = b;
+			} else {
+				// Reset cmdLength and send back length error message
+				cmdLength = 0;
+				if(debug) {
+					Serial.print("ERROR#"); Serial.print(SERIAL_ERR_LENGTH, DEC);
+					Serial.println("! Incorrect length");
+				} else {
+					Serial.write(SERIAL_ERR_LENGTH);
+					Serial.write(255);
+				}
+				// cmdError = true;
+			}
+			cmdReadLen = false;
+			cmdIndexCnt = 0;
+		}
+		// When stop character received...
+		else if(b == SERIAL_CMD_STOP) {
 			// Toggle sync pin for time measurement
 			syncPinState = !syncPinState;
 			digitalWrite(SYNC_PIN_1, syncPinState);
 
-			command.trim();		// Trim leading and trailing spaces
 			if(debug) {
-				strLength = command.length();
-				Serial.print("\n\n****************************************\nNew command: "); Serial.print(command);
-				Serial.print(" (length: "); Serial.print(strLength); Serial.println(")");
-				Serial.print("****************************************\n");
+				Serial.print("\r\n\r\n****************************************\r\nNew command: "); 
+				for(uint8_t i = 0; i < (cmdIndexCnt/2); i++) {
+					uint8_t col = ( ((i % 2) == 0) ? (i/2) : ((i-1)/2) );
+						Serial.print(HSd.HScoord[i][0], DEC); Serial.print(" ");
+						Serial.print(HSd.HScoord[i][1], DEC); Serial.print(" ");
+					// Serial.print(cmd[i], DEC); Serial.print(" ");
+				}
+				Serial.print(" (l = "); Serial.print(cmdIndexCnt, DEC); Serial.println(")");
+				Serial.print(" Entered length: "); Serial.println(cmdLength, DEC);
+				Serial.print("****************************************\r\n");
 			}
 			
-			// Slice the received ASCII characters between spaces and
-			// put the slices into slicedCmd[] array
-			strLength = sliceCommand(command);
-
-			// Toggle sync pin for time measurement
-			syncPinState = !syncPinState;
-			digitalWrite(SYNC_PIN_1, syncPinState);		// measuring slicing time
-
-			// Input error check (odd coordinates)
-			uint8_t pairs = strLength / 2;
-			if(debug) {
-				Serial.print("\nPairs: "); Serial.print(pairs, DEC);
-				Serial.print(" x 2 = "); Serial.println((2 * pairs), DEC);
-				Serial.print("strLength: "); Serial.println(strLength, DEC);
-			}
-			if((2 * pairs) == strLength) {
-				// For each coordinate pair, convert the ASCII arrays into integers
-				// and fill the HSd.HScoord[][] pairs
-				for(uint8_t i = 0; i < pairs; i++) {
-					HSd.HScoord[i][0] = convertStrToInt(slicedCmd[2*i]);
-					HSd.HScoord[i][1] = convertStrToInt(slicedCmd[(2*i)+1]);
-					if(debug) {
-						Serial.print("HScoord: "); Serial.print(HSd.HScoord[i][0]);
-						Serial.print(" "); Serial.println(HSd.HScoord[i][1]);
-					}
+			// Verify if command index counter corresponds to the entered command length
+			if( (cmdIndexCnt != 0) && (cmdIndexCnt == cmdLength) ) {
+				if(debug) {
+					Serial.println("Processing entered data...");
 				}
+				
+				distributeCoordinates((cmdLength/2), HSd.HScoord, HSd.HSpiezo);
 
-				// Toggle sync pin for time measurement
-				// syncPinState = !syncPinState;
-				// digitalWrite(SYNC_PIN_1, syncPinState);
-
-				// Distribute HScoord to their corresponding slave and
-				// calculate for each the piezo index or serial command
-				distributeCoordinates(pairs, HSd.HScoord, HSd.HSpiezo);
-
-				// Toggle sync pin for time measurement
-				// syncPinState = !syncPinState;
-				// digitalWrite(SYNC_PIN_1, syncPinState);
-
-				// Command parser, resp. coordinate forwarder
-				for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
-					if(HSd.i2cSlaveAvailable[i]) {	// for each available slave...
-						// ...switch off all
-						if(HSd.piezoOffAll[i]) {
-							if(debug) {
-								Serial.print("\nSending piezo off command to slave #"); Serial.println(i, DEC);
-							}							
-							// // Switch off all drivers
-							// driver = -1;
-							// reset = false;
-							// on = false;
-							// gain = 0;
-							// bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], driver, reset, on, gain);
-
-							// if(debug) {
-								// if(setupOk) {
-									// Serial.println("drv2667 switched off, closing relays");
-								// } else {
-								// 	Serial.println("drv2667 setup failed!");
-								// }
-							// }
-							// Close all relays, if switching off successful or not
-							sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
-						}
-						// ...send coordinate values
-						else if(HSd.piCnt[i] > 0) {
-							// Toggle sync pin for time measurement
-							syncPinState = !syncPinState;
-							digitalWrite(SYNC_PIN_1, syncPinState);
-							if(debug) {
-								Serial.print("\nSending piezo settings to slave #"); Serial.println(i, DEC);
-							}
-
-							// Switch on the corresponding driver with maximum gain
-							// reset = false;
-							// on = true;
-							// gain = 3;
-							// bool setupOk = slaveDrvSetup(HSd.i2cSwitchAddress[i], driver, reset, on, gain);
-							//
-							// if(setupOk) {
-							// 	// Toggle sync pin for time measurement
-							// 	syncPinState = !syncPinState;
-							// 	digitalWrite(SYNC_PIN_1, syncPinState);
-							//
-							// 	if(debug) {
-							// 		Serial.println("drv2667 switched on, setting up relays");
-							// 	}
-							//
-								sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.piCnt[i]);
-							// } else {
-							// 	if(debug) {
-							// 		Serial.println("drv2667 setup failed, nothing done!");
-							// 	}
-							// }
-
-							// Toggle sync pin for time measurement
-							syncPinState = !syncPinState;
-							digitalWrite(SYNC_PIN_1, syncPinState);
-						}
-						else if(HSd.piCnt[i] == 0) {
-							sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
-						}
-					}
-					// Reset all flags
-					HSd.piezoOffAll[i] = false;
-					HSd.piCnt[i] = 0;
-				}
 				// Toggle sync pin for time measurement
 				syncPinState = !syncPinState;
-				digitalWrite(SYNC_PIN_1, syncPinState);		// measure sending time
-			}
-			// Odd number of coordinates entered, doing nothing
-			else {
+				digitalWrite(SYNC_PIN_1, syncPinState);
+
+				parseCommand();
+				
+				// Toggle sync pin for time measurement
+				syncPinState = !syncPinState;
+				digitalWrite(SYNC_PIN_1, syncPinState);
+
+			} else {
 				if(debug) {
-					Serial.println("Odd coordinate values, failed!");
+					Serial.print("ERROR#"); Serial.print(SERIAL_ERR_MISMATCH, DEC);
+					Serial.println("! Mismatch");
+				} else {
+					Serial.write(SERIAL_ERR_MISMATCH);
+					Serial.println();
 				}
 			}
 		}
 		// Concatenating currently entered input
 		else {
-			command += c;
-		}
-	}
-}
-
-
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-/* | sliceCommand															| */
-/* -------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------- */
-uint8_t sliceCommand(String s)
-{
-	if(debug) {
-		Serial.println("\nSlicing command line into ints...");
-		Serial.println("----------------------------------------");
-		Serial.print("Received command length: "); Serial.println(s.length(), DEC);
-	}
-	
-	String temp = "";
-	uint8_t sliceInc = 0;
-	
-	for(uint8_t i = 0; i < s.length(); i++) {
-		if(debug) {
-			Serial.print("char: "); Serial.print(s[i], DEC);
-		}
-		if(s[i] == ' ') {
-			slicedCmd[sliceInc++] = temp;
-			temp = "";
-			if(debug) {
-				Serial.println(" - separator...");
+			uint8_t col = ( ((cmdIndexCnt % 2) == 0) ? (cmdIndexCnt/2) : ((cmdIndexCnt-1)/2) );
+			if( (cmdIndexCnt % 2) == 0) {
+				HSd.HScoord[col][0] = b;
+			} else {
+				HSd.HScoord[col][1] = b;
 			}
-		} else {
-			if(debug) {
-				Serial.println("");
-			}
-			temp += s[i];
+
+			cmdIndexCnt += 1;
 		}
 	}
-	slicedCmd[sliceInc++] = temp;
-	
-	if(debug) {
-		Serial.print("\nSliced command line (length: "); Serial.print(sliceInc); Serial.println(")");
-		for(uint8_t i = 0; i < (sliceInc); i++) {
-			Serial.print(slicedCmd[i]); Serial.print(" ");
-		}
-		Serial.println("\n");
-	}
-	
-	return sliceInc;
 }
 
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-/* | convertStrToInt														| */
+/* | parseCommand															| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-uint8_t convertStrToInt(String s)
+void parseCommand(void)
 {
-	char test[s.length()+1];
-	s.toCharArray(test, sizeof(test));
-	return atoi(test);
+	// Command parser, resp. coordinate forwarder
+	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
+		if(HSd.i2cSlaveAvailable[i]) {	// for each available slave...
+			// ...switch off all
+			if(HSd.piezoOffAll[i]) {
+				if(debug) {
+					Serial.print("\nSending piezo off command to slave #"); Serial.println(i, DEC);
+				}
+				// Close all relays, if switching off successful or not
+				sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
+			}
+			// ...send coordinate values
+			else if(HSd.piCnt[i] > 0) {
+				// // Toggle sync pin for time measurement
+				// syncPinState = !syncPinState;
+				// digitalWrite(SYNC_PIN_1, syncPinState);
+				
+				if(debug) {
+					Serial.print("\nSending piezo settings to slave #"); Serial.println(i, DEC);
+				}
+				
+				sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.piCnt[i]);
+
+				// // Toggle sync pin for time measurement
+				// syncPinState = !syncPinState;
+				// digitalWrite(SYNC_PIN_1, syncPinState);
+			}
+			else if(HSd.piCnt[i] == 0) {
+				sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
+			}
+		}
+		// Reset all flags
+		HSd.piezoOffAll[i] = false;
+		HSd.piCnt[i] = 0;
+	}
+	// // Toggle sync pin for time measurement
+	// syncPinState = !syncPinState;
+	// digitalWrite(SYNC_PIN_1, syncPinState);
 }
+
+
 
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -591,7 +534,7 @@ void slaveInitNotify(int8_t addr, bool notification)
 /* | distributeCoordinates													| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX])
+void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX])
 {
 								
 	uint8_t mod = 0;					// index modulo
@@ -603,7 +546,7 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 	bool cmdMode = false;				// command mode flag
 
 	if(debug) {
-		Serial.print("\nDistributing coordinates... length: "); Serial.println(len);
+		Serial.print("\nDistributing coordinates... pairs: "); Serial.println(len);
 		Serial.println("----------------------------------------");
 	}
 	
@@ -710,21 +653,24 @@ void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t 
 		// Thus, first of all, add 1 to the input column number!
 		else {
 			orig[i][0] += 1;
-			if(orig[i][0] < HS_CPS) {
-				mod = 0;
-				sn = 0;
-			} else if(orig[i][0] < (2 * HS_CPS)) {
-				mod = HS_CPS;
-				sn = 1;
-			} else if(orig[i][0] < (3 * HS_CPS)) {
-				mod = 2 * HS_CPS;
-				sn = 2;
-			} else if(orig[i][0] < (4 * HS_CPS)) {
-				mod = 3 * HS_CPS;
-				sn = 3;
-			}
+			sn = orig[i][0] / HS_CPS;
+			mod = sn * HS_CPS;
+			
+			// if(orig[i][0] < HS_CPS) {
+			// 	mod = 0;
+			// 	sn = 0;
+			// } else if(orig[i][0] < (2 * HS_CPS)) {
+			// 	mod = HS_CPS;
+			// 	sn = 1;
+			// } else if(orig[i][0] < (3 * HS_CPS)) {
+			// 	mod = 2 * HS_CPS;
+			// 	sn = 2;
+			// } else if(orig[i][0] < (4 * HS_CPS)) {
+			// 	mod = 3 * HS_CPS;
+			// 	sn = 3;
+			// }
 			// Nothing matched... something went entered wrong.
-			else {
+			if(orig[i][0] > 30) {
 				if(debug) {
 					Serial.println("\nColumn value not valid! No slave...");
 				}

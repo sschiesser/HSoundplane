@@ -39,6 +39,15 @@
 										// 1. host command reception (CDC or rawHID)
 										// 2. debugging
 
+#define SERIAL_CMD_START	253
+#define SERIAL_CMD_STOP		255
+#define SERIAL_CMD_MAXLEN	250
+
+#define SERIAL_ERR_NOERROR	0
+#define SERIAL_ERR_MISMATCH	1
+#define SERIAL_ERR_LENGTH	2
+#define SERIAL_ERR_OVERFLOW	3
+
 #define STARTUP_WAIT_MS		1000		// startup waiting time to let the slaves be ready
 #define INIT_WAIT_MS		50			// initialization waiting time to SEE slave getting ready
 
@@ -73,5 +82,5 @@ extern struct HSdata HSd;
 /* | FUNCTIONS																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-uint8_t parseCommand(String);
+void parseCommand(void);
 #endif
