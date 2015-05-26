@@ -31,15 +31,28 @@
 
 struct HSdata HSd;
 
+// Initialize all HSoundplane data...
 void HSInit(void) {
 	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
+		// Flags & bit masks for relays and drivers
 		HSd.piezoOffAll[i] = false;
 		HSd.drvOnAll[i] = false;
 		HSd.drvOffAll[i] = false;
 		HSd.drvOn[i] = 0;
 		HSd.drvOff[i] = 0;
+		HSd.drvBm[i] = 0;
+		HSd.drvOldBm[i] = 0;
 		
+		// 
 		HSd.i2cSlaveAvailable[i] = false;
 		HSd.i2cSlaveSetup[i] = false;
+		
+		// Input coordinates & output index (+counter)
+		for(uint8_t j = 0; j < HS_COORD_MAX; j++) {
+			HSd.inputCoord[j][0] = 0;
+			HSd.inputCoord[j][1] = 0;
+			HSd.outputIndex[i][j] = 0;
+		}
+		HSd.indexCnt[i] = 0;
 	}
 }

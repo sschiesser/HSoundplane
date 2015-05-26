@@ -79,6 +79,7 @@
 #define SCMD_DON_S2			132
 #define SCMD_DON_S3			133
 #define SCMD_DON_ALL		139
+#define SCMD_DEBUG			200
 
 #define SERR_NOERROR		0
 #define SERR_MISMATCH		1
@@ -100,7 +101,7 @@
 /* | VARIABLES																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool debug = true;						// DEBUG FLAG!!
+bool debug = false;						// DEBUG FLAG!!
 
 #if(I2C_FAST_MODE > 0)					// i2c speed flag
   bool i2cFastMode = true;

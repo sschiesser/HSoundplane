@@ -31,12 +31,9 @@
 #include "hsoundplane.h"
 #include "masterSettings.h"
 
-// String command;							// serial command to parse
 
-// uint8_t cmd[250];
 bool cmdByteOne = false;
 bool cmdZeroLen = false;
-// bool cmdError = false;
 int8_t cmdLength;
 int8_t cmdIndexCnt;
 
@@ -77,7 +74,7 @@ void setup()
 		Serial.print("serial:\n\t- port @ "); Serial.println(SERIAL_SPEED, DEC);
 		Serial.print("i2c:\n\t- port @ "); Serial.println((i2cFastMode) ? "400 kHz" : "100 kHz");
 		Serial.print("slaves:\n\t- quantity: "); Serial.println(HS_SLAVE_NUMBER, DEC);
-		Serial.print("piezos:\n\t- items/column: "); Serial.println((HSd.col9) ? "9" : "5");
+		Serial.print("piezos:\n\t- items/column: "); Serial.println((HSd.raw9) ? "9" : "5");
 		Serial.println("**************************************\n");
 	}
 
@@ -182,7 +179,7 @@ void loop()
 						Serial.write(SERR_CRLF);
 					}
 				} else {
-					HSd.HScoord[(cmdIndexCnt-1)/2][1] = b;
+					HSd.inputCoord[(cmdIndexCnt-1)/2][1] = b;
 				}
 
 				cmdIndexCnt += 1;
@@ -194,8 +191,8 @@ void loop()
 					Serial.print("\r\n\r\n****************************************\r\nNew command: "); 
 					for(uint8_t i = 0; i < (cmdIndexCnt/2); i++) {
 						uint8_t col = ( ((i % 2) == 0) ? (i/2) : ((i-1)/2) );
-						Serial.print(HSd.HScoord[i][0], DEC); Serial.print(" ");
-						Serial.print(HSd.HScoord[i][1], DEC); Serial.print(" ");
+						Serial.print(HSd.inputCoord[i][0], DEC); Serial.print(" ");
+						Serial.print(HSd.inputCoord[i][1], DEC); Serial.print(" ");
 						// Serial.print(cmd[i], DEC); Serial.print(" ");
 					}
 					Serial.print(" (l = "); Serial.print(cmdIndexCnt, DEC); Serial.println(")");
@@ -210,7 +207,7 @@ void loop()
 				syncPinState = !syncPinState;
 				digitalWrite(SYNC_PIN_1, syncPinState);
 
-				distributeCoordinates((cmdLength/2), HSd.HScoord, HSd.HSpiezo);
+				distributeCoordinates((cmdLength/2), HSd.inputCoord, HSd.outputIndex);
 
 				// Toggle sync pin for time measurement
 				syncPinState = !syncPinState;
@@ -252,13 +249,13 @@ void loop()
 				Serial.print(", cmdLength = "); Serial.println(cmdLength, DEC);
 			}
 			
-			// cmdIndexCnt is indexed for each byte, while the HScoord table saves coordinate
+			// cmdIndexCnt is indexed for each byte, while the inputCoord table saves coordinate
 			// pairs of half length
 			uint8_t p = ( ((cmdIndexCnt % 2) == 0) ? (cmdIndexCnt/2) : ((cmdIndexCnt-1)/2) );
 			if( (cmdIndexCnt % 2) == 0) {
-				HSd.HScoord[p][0] = b;
+				HSd.inputCoord[p][0] = b;
 			} else {
-				HSd.HScoord[p][1] = b;
+				HSd.inputCoord[p][1] = b;
 			}
 
 			cmdIndexCnt += 1;
@@ -307,7 +304,6 @@ void parseCommand(void)
 				reset = false;
 				on = false;
 				gain = 0;
-				// slaveDrvSetup(addr, drvMask, reset, on, gain);
 				HSd.drvOffAll[i] = false;
 			}
 			// ...switch on all drivers
@@ -321,7 +317,6 @@ void parseCommand(void)
 				reset = false;
 				on = true;
 				gain = 3;
-				// slaveDrvSetup(addr, drvMask, reset, on, gain);
 				HSd.drvOnAll[i] = false;
 			}
 			// ...switch off selected drivers
@@ -335,7 +330,6 @@ void parseCommand(void)
 				reset = false;
 				on = false;
 				gain = 0;
-				// slaveDrvSetup(addr, drvMask, reset, on, gain);
 				HSd.drvOff[i] = 0;
 			}
 			// ...switch on selected drivers
@@ -349,34 +343,33 @@ void parseCommand(void)
 				reset = false;
 				on = true;
 				gain = 3;
-				// slaveDrvSetup(addr, drvMask, reset, on, gain);
 				HSd.drvOn[i] = 0;
 			}
 			// ...send coordinate values
-			else if(HSd.piCnt[i] > 0) {
+			else if(HSd.indexCnt[i] > 0) {
 				if(debug) {
 					Serial.print("\nSending piezo settings to slave #"); Serial.println(i, DEC);
 				}
 				
-				sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.piCnt[i]);
+				sendToSlave(HSd.i2cSlaveAddress[i], HSd.outputIndex[i], HSd.indexCnt[i]);
 
 				addr = HSd.i2cSwitchAddress[i];
-				drvMask = ~HSd.dBm[i] & HSd.dBmOld[i];
+				drvMask = ~HSd.drvBm[i] & HSd.drvOldBm[i];
 				reset = false;
 				on = false;
 				gain = 0;
 				slaveDrvSetup(addr, drvMask, reset, on, gain);
 
-				drvMask = HSd.dBm[i];
+				drvMask = HSd.drvBm[i];
 				on = true;
 				gain = 3;
 				
-				HSd.piCnt[i] = 0;
-				HSd.dBmOld[i] = HSd.dBm[i];
-				HSd.dBm[i] = 0;
+				HSd.indexCnt[i] = 0;
+				HSd.drvOldBm[i] = HSd.drvBm[i];
+				HSd.drvBm[i] = 0;
 			}
 			// ...no coordinate received, switch off piezos & drivers
-			else if(HSd.piCnt[i] == 0) {
+			else if(HSd.indexCnt[i] == 0) {
 				if(debug) {
 					Serial.print("No coordinate received for slave#"); Serial.print(i, DEC);
 					Serial.println(". Closing relays & switching off drivers.");
@@ -678,7 +671,7 @@ void slaveInitNotify(int8_t addr, bool notification)
 /* | distributeCoordinates													| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX])
+void distributeCoordinates(uint8_t len, uint8_t in[HS_COORD_MAX][2], uint8_t out[HS_SLAVE_NUMBER][HS_COORD_MAX])
 {
 
 	if(debug) {
@@ -696,55 +689,59 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 		}
 		
 		// Check (first) if command mode was entered
-		if(orig[i][0] >= SCMD_SETTINGS) {
+		if(in[i][0] >= SCMD_SETTINGS) {
 			bool cmdErr = false;
-			switch(orig[i][0]) {
+			switch(in[i][0]) {
 				// Switch off all relays of slave# given in orig[i][1]
 				case SCMD_POFF_ALL:
-				if(orig[i][1] < HS_SLAVE_NUMBER) HSd.piezoOffAll[orig[i][1]] = true;
+				if(in[i][1] < HS_SLAVE_NUMBER) HSd.piezoOffAll[in[i][1]] = true;
 				else cmdErr = true;
 				break;
 				// Switch off drivers of slave1 according to the bitmask in orig[i][1]
 				case SCMD_DOFF_S0:
-				HSd.drvOff[0] = orig[i][1];
+				HSd.drvOff[0] = in[i][1];
 				break;
 				// Switch off drivers of slave2 according to the bitmask in orig[i][1]
 				case SCMD_DOFF_S1:
-				HSd.drvOff[1] = orig[i][1];
+				HSd.drvOff[1] = in[i][1];
 				break;
 				// Switch off drivers of slave3 according to the bitmask in orig[i][1]
 				case SCMD_DOFF_S2:
-				HSd.drvOff[2] = orig[i][1];
+				HSd.drvOff[2] = in[i][1];
 				break;
 				// Switch off drivers of slave4 according to the bitmask in orig[i][1]
 				case SCMD_DOFF_S3:
-				HSd.drvOff[3] = orig[i][1];
+				HSd.drvOff[3] = in[i][1];
 				break;
 				// Switch off all drivers of slave# given in orig[i][1]
 				case SCMD_DOFF_ALL:
-				if(orig[i][i] < HS_SLAVE_NUMBER) HSd.drvOffAll[orig[i][1]] = true;
+				if(in[i][i] < HS_SLAVE_NUMBER) HSd.drvOffAll[in[i][1]] = true;
 				else cmdErr = true;
 				break;
 				// Switch on drivers of slave1 according to the bitmask in orig[i][1]
 				case SCMD_DON_S0:
-				HSd.drvOn[0] = orig[i][1];
+				HSd.drvOn[0] = in[i][1];
 				break;
 				// Switch on drivers of slave2 according to the bitmask in orig[i][1]
 				case SCMD_DON_S1:
-				HSd.drvOn[1] = orig[i][1];
+				HSd.drvOn[1] = in[i][1];
 				break;
 				// Switch on drivers of slave3 according to the bitmask in orig[i][1]
 				case SCMD_DON_S2:
-				HSd.drvOn[2] = orig[i][1];
+				HSd.drvOn[2] = in[i][1];
 				break;
 				// Switch on drivers of slave4 according to the bitmask in orig[i][1]
 				case SCMD_DON_S3:
-				HSd.drvOn[3] = orig[i][1];
+				HSd.drvOn[3] = in[i][1];
 				break;
 				// Switch on all drivers of slave# given in orig[i][1]
 				case SCMD_DON_ALL:
-				if(orig[i][1] < HS_SLAVE_NUMBER) HSd.drvOnAll[orig[i][1]] = true;
+				if(in[i][1] < HS_SLAVE_NUMBER) HSd.drvOnAll[in[i][1]] = true;
 				else cmdErr = true;
+				break;
+				// Switch on/off debug mode
+				case SCMD_DEBUG:
+				debug = (in[i][1] > 0) ? true : false;
 				break;
 				// No command match
 				default:
@@ -774,23 +771,23 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 		// the Soundplane columns 0 to 29 correspond to the haptic columns 1 to 30, on
 		// audio channels 2 to 31!
 		// Thus, first of all, add 1 to the input column number!
-		else if((orig[i][0] += HS_COL_OFFSET) < HS_COL_NUMBER) {
+		else if((in[i][0] += HS_COL_OFFSET) < HS_COL_NUMBER) {
 			bool rErr = false;
 
 			// First assign col to the corresponding slave number (sn) and modulo value (mod).
-			uint8_t sn = orig[i][0] / HS_CPS;
+			uint8_t sn = in[i][0] / HS_CPS;
 			uint8_t mod = sn * HS_CPS;
 			
 			// Then check if raw was also entered within the HSoundplane range.
-			if(HSd.col9) {
-				if(orig[i][1] > 8) {
+			if(HSd.raw9) {
+				if(in[i][1] > 8) {
 					rErr = true;
 					if(debug) {
 						Serial.println("Raw value not valid (> 8)!");
 					}						
 				}
 			} else {
-				if(orig[i][1] > 4) {
+				if(in[i][1] > 4) {
 					rErr = true;
 					if(debug) {
 						Serial.println("Raw value not valid (> 4)!");
@@ -801,27 +798,27 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 			// If coordinates were entered correctly, calculate the piezo index.
 			if(!rErr) {
 				// calculate the linear position (piezo index) of the pair
-				// and save it as next item of the selected slave of 'HSpiezo'.
+				// and save it as next item of the selected slave of 'outputIndex'.
 				// !! always multiply by 9!! Not connected piezo will be skipped.
-				uint8_t pi = ((orig[i][0] - mod) * 9) + (orig[i][1] * 2);
-				HSd.HSpiezo[sn][HSd.piCnt[sn]] = pi;
-				HSd.piCnt[sn] += 1;	// increment the pi counter of the selected slave
+				uint8_t pi = ((in[i][0] - mod) * 9) + (in[i][1] * 2);
+				HSd.outputIndex[sn][HSd.indexCnt[sn]] = pi;
+				HSd.indexCnt[sn] += 1;	// increment the pi counter of the selected slave
 				
-				HSd.dBm[sn] |= (1 << (orig[i][0] - mod));
+				HSd.drvBm[sn] |= (1 << (in[i][0] - mod));
 	
 				if(debug) {
-					uint8_t pi5 = ((orig[i][0] - mod) * 5) + orig[i][1];
+					uint8_t pi5 = ((in[i][0] - mod) * 5) + in[i][1];
 
 					Serial.print("\nWorking on slave #"); Serial.print(sn, DEC); Serial.println("...");
-					Serial.print("- col value = "); Serial.println((orig[i][0] - mod), DEC);
-					Serial.print("- raw value = "); Serial.println(orig[i][1], DEC);
+					Serial.print("- col value = "); Serial.println((in[i][0] - mod), DEC);
+					Serial.print("- raw value = "); Serial.println(in[i][1], DEC);
 					Serial.print("- available? "); Serial.println((HSd.i2cSlaveAvailable[sn]) ? "yes" : "no");
 					Serial.print("- setup ok? "); Serial.println((HSd.i2cSlaveSetup[sn]) ? "yes" : "no");
 					Serial.print("- piezo#: "); Serial.print(pi, DEC);
 					Serial.print("("); Serial.print(pi5, DEC); Serial.println(")");  
-					Serial.print("- HSpiezo: "); Serial.print(HSd.HSpiezo[sn][HSd.piCnt[sn]-1], DEC);
-					Serial.print(" / piCnt: "); Serial.println((HSd.piCnt[sn]-1), DEC);
-					Serial.print("- dBm: "); Serial.println(HSd.dBm[sn], BIN);
+					Serial.print("- outputIndex: "); Serial.print(HSd.outputIndex[sn][HSd.indexCnt[sn]-1], DEC);
+					Serial.print(" / indexCnt: "); Serial.println((HSd.indexCnt[sn]-1), DEC);
+					Serial.print("- drvBm: "); Serial.println(HSd.drvBm[sn], BIN);
 				}
 			} else {
 				if(debug) {
