@@ -122,4 +122,9 @@ extern struct HSdata HSd;
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
 void parseCommand(void);
+void slaveRegister(void);
+uint8_t slaveDrvSetup(int8_t addr, uint8_t dbm, bool reset, bool on, uint8_t gain);
+void slaveInitNotify(int8_t addr, bool notification);
+void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX]);
+void sendToSlave(uint8_t sAddr, uint8_t *mes, uint8_t len);
 #endif
