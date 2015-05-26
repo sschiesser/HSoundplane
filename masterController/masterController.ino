@@ -274,20 +274,26 @@ void loop()
 /* -------------------------------------------------------------------------- */
 void parseCommand(void)
 {
-	int8_t addr;
-	uint8_t drvMask, gain;
-	bool reset, on;
+	int8_t addr = 0;
+	uint8_t drvMask = 0;
+	uint8_t gain = 0;
+	bool reset = false;
+	bool on = false;
 	// Command parser, resp. coordinate forwarder
 	for(uint8_t i = 0; i < HS_SLAVE_NUMBER; i++) {
-		// if(HSd.i2cSlaveAvailable[i]) {	// for each available slave...
+		// if(HSd.i2cSlaveAvailable[i]) {
 			// ...switch off all piezos (relay)
 			if(HSd.piezoOffAll[i]) {
 				if(debug) {
 					Serial.print("\nSwitching off piezos on slave#");
 					Serial.println(i, DEC);
 				}
-				// Close all relays, if switching off successful or not
 				sendToSlave(HSd.i2cSlaveAddress[i], NULL, 0);
+				addr = HSd.i2cSwitchAddress[i];
+				drvMask = 0xFF;
+				reset = false;
+				on = false;
+				gain = 3;
 				HSd.piezoOffAll[i] = false;
 			}
 			// ...swich off all drivers
@@ -301,7 +307,7 @@ void parseCommand(void)
 				reset = false;
 				on = false;
 				gain = 0;
-				slaveDrvSetup(addr, drvMask, reset, on, gain);
+				// slaveDrvSetup(addr, drvMask, reset, on, gain);
 				HSd.drvOffAll[i] = false;
 			}
 			// ...switch on all drivers
@@ -315,7 +321,7 @@ void parseCommand(void)
 				reset = false;
 				on = true;
 				gain = 3;
-				slaveDrvSetup(addr, drvMask, reset, on, gain);
+				// slaveDrvSetup(addr, drvMask, reset, on, gain);
 				HSd.drvOnAll[i] = false;
 			}
 			// ...switch off selected drivers
@@ -329,7 +335,7 @@ void parseCommand(void)
 				reset = false;
 				on = false;
 				gain = 0;
-				slaveDrvSetup(addr, drvMask, reset, on, gain);
+				// slaveDrvSetup(addr, drvMask, reset, on, gain);
 				HSd.drvOff[i] = 0;
 			}
 			// ...switch on selected drivers
@@ -343,7 +349,7 @@ void parseCommand(void)
 				reset = false;
 				on = true;
 				gain = 3;
-				slaveDrvSetup(addr, drvMask, reset, on, gain);
+				// slaveDrvSetup(addr, drvMask, reset, on, gain);
 				HSd.drvOn[i] = 0;
 			}
 			// ...send coordinate values
@@ -353,13 +359,23 @@ void parseCommand(void)
 				}
 				
 				sendToSlave(HSd.i2cSlaveAddress[i], HSd.HSpiezo[i], HSd.piCnt[i]);
+
 				addr = HSd.i2cSwitchAddress[i];
-				drvMask = 0;
+				drvMask = ~HSd.dBm[i] & HSd.dBmOld[i];
 				reset = false;
+				on = false;
+				gain = 0;
+				slaveDrvSetup(addr, drvMask, reset, on, gain);
+
+				drvMask = HSd.dBm[i];
 				on = true;
 				gain = 3;
+				
 				HSd.piCnt[i] = 0;
+				HSd.dBmOld[i] = HSd.dBm[i];
+				HSd.dBm[i] = 0;
 			}
+			// ...no coordinate received, switch off piezos & drivers
 			else if(HSd.piCnt[i] == 0) {
 				if(debug) {
 					Serial.print("No coordinate received for slave#"); Serial.print(i, DEC);
@@ -371,17 +387,12 @@ void parseCommand(void)
 				reset = false;
 				on = false;
 				gain = 0;
-				slaveDrvSetup(addr, drvMask, reset, on, gain);
+				// slaveDrvSetup(addr, drvMask, reset, on, gain);
 			}
-			// slaveDrvSetup(addr, drvMask, reset, on, gain);
+
+			slaveDrvSetup(addr, drvMask, reset, on, gain);
 		// }
-		// Reset all flags
-		// HSd.piezoOffAll[i] = false;
-		// HSd.piCnt[i] = 0;
 	}
-	// // Toggle sync pin for time measurement
-	// syncPinState = !syncPinState;
-	// digitalWrite(SYNC_PIN_1, syncPinState);
 }
 
 
@@ -669,15 +680,6 @@ void slaveInitNotify(int8_t addr, bool notification)
 /* -------------------------------------------------------------------------- */
 void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX])
 {
-								
-	uint8_t mod = 0;					// index modulo
-	uint8_t sn = 0;						// slave number
-	uint8_t pi = 0;						// piezo index
-	uint8_t col = 0;
-	// bool cErr = false;					// column input error flag
-	bool rErr = false;					// raw input error flag
-	bool cmdErr = false;
-	// bool cmdMode = false;				// command mode flag
 
 	if(debug) {
 		Serial.print("\nDistributing coordinates... pairs: "); Serial.println(len);
@@ -695,7 +697,7 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 		
 		// Check (first) if command mode was entered
 		if(orig[i][0] >= SCMD_SETTINGS) {
-			// cmdMode = true;
+			bool cmdErr = false;
 			switch(orig[i][0]) {
 				// Switch off all relays of slave# given in orig[i][1]
 				case SCMD_POFF_ALL:
@@ -773,10 +775,11 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 		// audio channels 2 to 31!
 		// Thus, first of all, add 1 to the input column number!
 		else if((orig[i][0] += HS_COL_OFFSET) < HS_COL_NUMBER) {
+			bool rErr = false;
+
 			// First assign col to the corresponding slave number (sn) and modulo value (mod).
-			// orig[i][0] += 1;
-			sn = orig[i][0] / HS_CPS;
-			mod = sn * HS_CPS;
+			uint8_t sn = orig[i][0] / HS_CPS;
+			uint8_t mod = sn * HS_CPS;
 			
 			// Then check if raw was also entered within the HSoundplane range.
 			if(HSd.col9) {
@@ -800,9 +803,11 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 				// calculate the linear position (piezo index) of the pair
 				// and save it as next item of the selected slave of 'HSpiezo'.
 				// !! always multiply by 9!! Not connected piezo will be skipped.
-				pi = ((orig[i][0] - mod) * 9) + (orig[i][1] * 2);
+				uint8_t pi = ((orig[i][0] - mod) * 9) + (orig[i][1] * 2);
 				HSd.HSpiezo[sn][HSd.piCnt[sn]] = pi;
 				HSd.piCnt[sn] += 1;	// increment the pi counter of the selected slave
+				
+				HSd.dBm[sn] |= (1 << (orig[i][0] - mod));
 	
 				if(debug) {
 					uint8_t pi5 = ((orig[i][0] - mod) * 5) + orig[i][1];
@@ -816,8 +821,16 @@ void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t d
 					Serial.print("("); Serial.print(pi5, DEC); Serial.println(")");  
 					Serial.print("- HSpiezo: "); Serial.print(HSd.HSpiezo[sn][HSd.piCnt[sn]-1], DEC);
 					Serial.print(" / piCnt: "); Serial.println((HSd.piCnt[sn]-1), DEC);
+					Serial.print("- dBm: "); Serial.println(HSd.dBm[sn], BIN);
 				}
 			} else {
+				if(debug) {
+					Serial.print("ERROR#"); Serial.print(SERR_VALUES);
+					Serial.println("! Wrong values entered");
+				} else {
+					Serial.write(SERR_VALUES);
+					Serial.write(SERR_CRLF);
+				}
 				rErr = false;
 			}
 		}
