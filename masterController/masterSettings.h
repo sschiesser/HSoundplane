@@ -84,6 +84,7 @@
 #define SERR_MISMATCH		1
 #define SERR_LENGTH			2
 #define SERR_OVERFLOW		3
+#define SERR_VALUES			4
 #define SERR_CRLF			255
 
 #define STARTUP_WAIT_MS		1000		// startup waiting time to let the slaves be ready
