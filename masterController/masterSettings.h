@@ -38,11 +38,36 @@
 #define SERIAL_SPEED		230400		// serial communication speed for
 										// 1. host command reception (CDC or rawHID)
 										// 2. debugging
-#define START_MARKER_MASK	0xE0		// bit mask to recognize serial start byte (ST)
-#define STOP_MARKER_MASK	0xF0		// bit mask to recognize serial stop byte (SP)
 
-#define STARTUP_WAIT_MS		50			// startup waiting time to let the slaves be ready
-#define INIT_WAIT_MS		5			// initialization waiting time to SEE slave getting ready
+#define SCMD_START			253			// serial command start byte
+#define SCMD_STOP			255			// serial command stop byte
+//-- SERIAL COMMANDS --
+#define SCMD_SETTINGS		100			// threshold value above wich
+										// setting commands are sent
+#define SCMD_POFF_ALL		110			// switch off all relays (byte 2: slave#)
+#define SCMD_DOFF_S0		120			// switch off slave0 drivers (byte 2: drivers bitmask)
+#define SCMD_DOFF_S1		121			// switch off slave1 drivers (byte 2: drivers bitmask)
+#define SCMD_DOFF_S2		122			// switch off slave2 drivers (byte 2: drivers bitmask)
+#define SCMD_DOFF_S3		123			// switch off slave3 drivers (byte 2: drivers bitmask)
+#define SCMD_DOFF_ALL		129			// switch off all drivers (byte 2: slave#)
+#define SCMD_DON_S0			130			// switch on slave0 drivers (byte 2: drivers bitmask)
+#define SCMD_DON_S1			131			// switch on slave1 drivers (byte 2: drivers bitmask)
+#define SCMD_DON_S2			132			// switch on slave2 drivers (byte 2: drivers bitmask)
+#define SCMD_DON_S3			133			// switch on slave3 drivers (byte 2: drivers bitmask)
+#define SCMD_DON_ALL		139			// switch on all drivers (byte 2: slave#)
+#define SCMD_DEBUG			200			// toggle debug mode (byte 2: 0 -> off, >0 -> on)
+#define SCMD_RESET			250			// master software reset (byte 2: unused)
+//-- ERROR MESSAGES --
+#define SERR_NOERROR		0			// no error
+#define SERR_MISMATCH		1			// mismatch between entered and calculated length
+#define SERR_COORD			2
+#define SERR_SETTINGS		3
+#define SERR_CRLF			255
+
+#define STARTUP_WAIT_MS		500			// startup waiting time to let the slaves be ready
+#define INIT_WAIT_MS		50			// initialization waiting time to SEE slave getting ready
+
+#define SLAVE_REG_RETRIES	5
 
 #define SYNC_PIN_1			2			// pin used to measure time between events
 
@@ -52,7 +77,7 @@
 /* | VARIABLES																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-bool debug = true;						// DEBUG FLAG!!
+bool debug = false;						// DEBUG FLAG!!
 
 #if(I2C_FAST_MODE > 0)					// i2c speed flag
   bool i2cFastMode = true;
@@ -62,11 +87,7 @@ bool debug = true;						// DEBUG FLAG!!
   
 bool syncPinState;
 
-int8_t driver;
-uint8_t gain;
-bool on, reset;
-
-String slicedCmd[2 * HS_COORD_MAX];		// command line sliced into integers
+// String slicedCmd[2 * HS_COORD_MAX];		// command line sliced into integers
 
 // extern...
 extern struct HSdata HSd;
@@ -77,11 +98,10 @@ extern struct HSdata HSd;
 /* | FUNCTIONS																| */
 /* -------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
-uint8_t sliceCommand(String s);
-uint8_t convertStrToInt(String s);
-void slaveRegister();
-bool slaveDrvSetup(int8_t addr, int8_t drv, bool reset, bool on, uint8_t gain);
-void slaveInitNotify(int8_t addr, bool notification);
-void distributeCoordinates(	uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX]);
+void parseCommand(void);
+void registerSlave(void);
+uint8_t setupSlaveDrv(int8_t addr, uint8_t dbm, bool reset, bool on, uint8_t gain);
+void notifySlave(int8_t addr, bool notification);
+void distributeCoordinates(uint8_t len, uint8_t orig[HS_COORD_MAX][2], uint8_t dest[HS_SLAVE_NUMBER][HS_COORD_MAX]);
 void sendToSlave(uint8_t sAddr, uint8_t *mes, uint8_t len);
 #endif
